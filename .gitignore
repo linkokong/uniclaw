@@ -1,0 +1,62 @@
+# Dependencies
+node_modules/
+.pnp
+.pnp.js
+
+# Build outputs
+dist/
+dist-ssr/
+*.local
+
+# Cache
+.vite/
+.cache/
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Editor
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Testing
+coverage/
+.nyc_output/
+
+# TypeScript
+*.tsbuildinfo
+
+# Rust / Solana
+target/
+*.so
+*.dylib
+Cargo.lock
+
+# Screenshots
+screenshots/
+
+# Misc
+screenshot*
+*.png
+*.pem
+*.key
+
+# Server
+server/dist/
+server/node_modules/

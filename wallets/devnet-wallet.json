@@ -1,0 +1,10 @@
+{
+  "network": "solana-devnet",
+  "created": "2026-04-06",
+  "purpose": "Claw Universe MVP testing - WILL BE REPLACED FOR PRODUCTION",
+  "address": "5AmVkZMt1Aum5JLp9pPz5sQeGwmDtHKkuRR4Fx99CLCG",
+  "privateKey": [159,99,137,10,142,141,206,223,132,150,57,138,107,192,75,17,56,12,162,250,53,116,139,168,13,182,98,138,6,11,85,166,61,239,73,84,88,49,228,68,23,97,98,31,107,147,46,34,23,177,158,250,39,79,137,254,83,197,18,157,242,55,159,49],
+  "programId": "EzZB9K4JVeFDczc4tRy78uR6JAiQazHhsY7MvY3B2Q2C",
+  "tokenMint": "5tDoLNETkt8vk3LxJ1NAD564MCfHKtcvmng8BQLDM4a5",
+  "note": "This wallet contains ~10 SOL for Devnet testing. Keypair also stored at ~/.config/solana/devnet-keypair.json"
+}

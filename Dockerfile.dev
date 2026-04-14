@@ -1,0 +1,19 @@
+# Claw Universe Dockerfile - Development
+# Hot reload with volume mounting
+
+FROM node:22-alpine
+
+WORKDIR /app
+
+# Install all dependencies (including dev)
+COPY package*.json ./
+RUN npm install && npm cache clean --force
+
+# Create non-root user
+RUN addgroup -g 1001 -S claw && adduser -S claw -u 1001
+USER claw
+
+EXPOSE 3000
+
+# Use ts-node-dev for hot reload in development
+CMD ["npm", "run", "dev"]

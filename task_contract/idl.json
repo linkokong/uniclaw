@@ -1,0 +1,396 @@
+{
+  "version": "0.1.1",
+  "name": "task_contract",
+  "instructions": [
+    {
+      "name": "initializePlatform",
+      "accounts": [
+        { "name": "authority", "isMut": true, "isSigner": true },
+        { "name": "treasury", "isMut": true, "isSigner": false },
+        { "name": "systemProgram", "isMut": false, "isSigner": false }
+      ],
+      "args": []
+    },
+    {
+      "name": "initializeWorkerProfile",
+      "accounts": [
+        { "name": "owner", "isMut": true, "isSigner": true },
+        { "name": "workerProfile", "isMut": true, "isSigner": false },
+        { "name": "systemProgram", "isMut": false, "isSigner": false }
+      ],
+      "args": []
+    },
+    {
+      "name": "createTask",
+      "accounts": [
+        { "name": "creator", "isMut": true, "isSigner": true },
+        { "name": "task", "isMut": true, "isSigner": false },
+        { "name": "escrow", "isMut": true, "isSigner": false },
+        { "name": "systemProgram", "isMut": false, "isSigner": false }
+      ],
+      "args": [
+        { "name": "title", "type": "string" },
+        { "name": "description", "type": "string" },
+        { "name": "requiredSkills", "type": { "vec": "string" } },
+        { "name": "reward", "type": "u64" },
+        { "name": "verificationPeriod", "type": "i64" }
+      ]
+    },
+    {
+      "name": "assignTask",
+      "accounts": [
+        { "name": "creator", "isMut": true, "isSigner": true },
+        { "name": "worker", "isMut": true, "isSigner": true },
+        { "name": "workerProfile", "isMut": false, "isSigner": false },
+        { "name": "task", "isMut": true, "isSigner": false }
+      ],
+      "args": []
+    },
+    {
+      "name": "submitBid",
+      "accounts": [
+        { "name": "bidder", "isMut": true, "isSigner": true },
+        { "name": "bid", "isMut": true, "isSigner": false },
+        { "name": "bidEscrow", "isMut": true, "isSigner": false },
+        { "name": "task", "isMut": false, "isSigner": false },
+        { "name": "systemProgram", "isMut": false, "isSigner": false }
+      ],
+      "args": [
+        { "name": "proposal", "type": "string" },
+        { "name": "deposit", "type": "u64" }
+      ]
+    },
+    {
+      "name": "withdrawBid",
+      "accounts": [
+        { "name": "bidder", "isMut": true, "isSigner": true },
+        { "name": "bid", "isMut": true, "isSigner": false },
+        { "name": "task", "isMut": false, "isSigner": false },
+        { "name": "bidEscrow", "isMut": true, "isSigner": false }
+      ],
+      "args": []
+    },
+    {
+      "name": "acceptBid",
+      "accounts": [
+        { "name": "creator", "isMut": true, "isSigner": true },
+        { "name": "bid", "isMut": true, "isSigner": false },
+        { "name": "task", "isMut": true, "isSigner": false },
+        { "name": "treasury", "isMut": true, "isSigner": false },
+        { "name": "workerProfile", "isMut": false, "isSigner": false },
+        { "name": "bidEscrow", "isMut": true, "isSigner": false }
+      ],
+      "args": []
+    },
+    {
+      "name": "rejectBid",
+      "accounts": [
+        { "name": "creator", "isMut": true, "isSigner": true },
+        { "name": "bid", "isMut": true, "isSigner": false },
+        { "name": "bidder", "isMut": true, "isSigner": false },
+        { "name": "task", "isMut": false, "isSigner": false },
+        { "name": "bidEscrow", "isMut": true, "isSigner": false }
+      ],
+      "args": []
+    },
+    {
+      "name": "startTask",
+      "accounts": [
+        { "name": "worker", "isMut": true, "isSigner": true },
+        { "name": "task", "isMut": true, "isSigner": false }
+      ],
+      "args": []
+    },
+    {
+      "name": "submitTask",
+      "accounts": [
+        { "name": "worker", "isMut": true, "isSigner": true },
+        { "name": "task", "isMut": true, "isSigner": false }
+      ],
+      "args": []
+    },
+    {
+      "name": "verifyTask",
+      "accounts": [
+        { "name": "creator", "isMut": true, "isSigner": true },
+        { "name": "worker", "isMut": false, "isSigner": false },
+        { "name": "task", "isMut": true, "isSigner": false },
+        { "name": "escrow", "isMut": true, "isSigner": false },
+        { "name": "treasury", "isMut": true, "isSigner": false },
+        { "name": "workerProfile", "isMut": true, "isSigner": false }
+      ],
+      "args": [
+        { "name": "approved", "type": "bool" }
+      ]
+    },
+    {
+      "name": "cancelTask",
+      "accounts": [
+        { "name": "creator", "isMut": true, "isSigner": true },
+        { "name": "task", "isMut": true, "isSigner": false },
+        { "name": "escrow", "isMut": true, "isSigner": false }
+      ],
+      "args": []
+    },
+    {
+      "name": "disputeTask",
+      "accounts": [
+        { "name": "worker", "isMut": true, "isSigner": true },
+        { "name": "task", "isMut": true, "isSigner": false },
+        { "name": "escrow", "isMut": true, "isSigner": false },
+        { "name": "workerProfile", "isMut": true, "isSigner": false },
+        { "name": "treasury", "isMut": true, "isSigner": false }
+      ],
+      "args": []
+    }
+  ],
+  "accounts": [
+    {
+      "name": "Task",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          { "name": "creator", "type": "publicKey" },
+          { "name": "worker", "type": "publicKey" },
+          { "name": "title", "type": "string" },
+          { "name": "description", "type": "string" },
+          { "name": "requiredSkills", "type": { "vec": "string" } },
+          { "name": "status", "type": "u8" },
+          { "name": "reward", "type": "u64" },
+          { "name": "verificationDeadline", "type": "i64" },
+          { "name": "submissionTime", "type": { "option": "i64" } },
+          { "name": "verificationTime", "type": { "option": "i64" } },
+          { "name": "bump", "type": "u8" },
+          { "name": "createdAt", "type": "i64" },
+          { "name": "workerReputationAtAssignment", "type": "u32" },
+          { "name": "acceptedBidDeposit", "type": "u64" }
+        ]
+      }
+    },
+    {
+      "name": "TaskEscrow",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          { "name": "task", "type": "publicKey" },
+          { "name": "balance", "type": "u64" },
+          { "name": "bump", "type": "u8" }
+        ]
+      }
+    },
+    {
+      "name": "PlatformTreasury",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          { "name": "authority", "type": "publicKey" },
+          { "name": "totalFeesCollected", "type": "u64" },
+          { "name": "feeBasisPoints", "type": "u16" },
+          { "name": "bump", "type": "u8" }
+        ]
+      }
+    },
+    {
+      "name": "AgentProfile",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          { "name": "owner", "type": "publicKey" },
+          { "name": "reputation", "type": "u32" },
+          { "name": "tasksCompleted", "type": "u64" },
+          { "name": "tasksFailed", "type": "u64" },
+          { "name": "tier", "type": "u8" },
+          { "name": "skills", "type": { "vec": "string" } },
+          { "name": "totalEarnings", "type": "u64" },
+          { "name": "bump", "type": "u8" }
+        ]
+      }
+    },
+    {
+      "name": "Bid",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          { "name": "task", "type": "publicKey" },
+          { "name": "bidder", "type": "publicKey" },
+          { "name": "proposal", "type": "string" },
+          { "name": "deposit", "type": "u64" },
+          { "name": "status", "type": "u8" },
+          { "name": "createdAt", "type": "i64" },
+          { "name": "bump", "type": "u8" }
+        ]
+      }
+    }
+  ],
+  "types": [
+    {
+      "name": "TaskStatus",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          { "name": "Created" },
+          { "name": "Assigned" },
+          { "name": "InProgress" },
+          { "name": "Completed" },
+          { "name": "Verified" },
+          { "name": "Cancelled" }
+        ]
+      }
+    },
+    {
+      "name": "BidStatus",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          { "name": "Active" },
+          { "name": "Accepted" },
+          { "name": "Rejected" },
+          { "name": "Cancelled" },
+          { "name": "Withdrawn" }
+        ]
+      }
+    },
+    {
+      "name": "AgentTier",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          { "name": "Bronze" },
+          { "name": "Silver" },
+          { "name": "Gold" },
+          { "name": "Platinum" }
+        ]
+      }
+    }
+  ],
+  "events": [
+    {
+      "name": "PlatformInitialized",
+      "fields": [
+        { "name": "authority", "type": "publicKey" },
+        { "name": "feeBasisPoints", "type": "u16" }
+      ]
+    },
+    {
+      "name": "TaskCreated",
+      "fields": [
+        { "name": "task", "type": "publicKey" },
+        { "name": "creator", "type": "publicKey" },
+        { "name": "reward", "type": "u64" },
+        { "name": "title", "type": "string" }
+      ]
+    },
+    {
+      "name": "TaskAssigned",
+      "fields": [
+        { "name": "task", "type": "publicKey" },
+        { "name": "worker", "type": "publicKey" },
+        { "name": "creator", "type": "publicKey" }
+      ]
+    },
+    {
+      "name": "TaskStarted",
+      "fields": [
+        { "name": "task", "type": "publicKey" },
+        { "name": "worker", "type": "publicKey" }
+      ]
+    },
+    {
+      "name": "TaskSubmitted",
+      "fields": [
+        { "name": "task", "type": "publicKey" },
+        { "name": "worker", "type": "publicKey" },
+        { "name": "submittedAt", "type": "i64" }
+      ]
+    },
+    {
+      "name": "TaskVerified",
+      "fields": [
+        { "name": "task", "type": "publicKey" },
+        { "name": "worker", "type": "publicKey" },
+        { "name": "approved", "type": "bool" },
+        { "name": "workerReward", "type": "u64" },
+        { "name": "feeAmount", "type": "u64" }
+      ]
+    },
+    {
+      "name": "TaskCancelled",
+      "fields": [
+        { "name": "task", "type": "publicKey" },
+        { "name": "creator", "type": "publicKey" },
+        { "name": "refundedAmount", "type": "u64" }
+      ]
+    },
+    {
+      "name": "TaskDisputeResolved",
+      "fields": [
+        { "name": "task", "type": "publicKey" },
+        { "name": "worker", "type": "publicKey" },
+        { "name": "workerReward", "type": "u64" },
+        { "name": "feeAmount", "type": "u64" },
+        { "name": "resolution", "type": "string" }
+      ]
+    },
+    {
+      "name": "BidSubmitted",
+      "fields": [
+        { "name": "bid", "type": "publicKey" },
+        { "name": "task", "type": "publicKey" },
+        { "name": "bidder", "type": "publicKey" },
+        { "name": "deposit", "type": "u64" }
+      ]
+    },
+    {
+      "name": "BidWithdrawn",
+      "fields": [
+        { "name": "bid", "type": "publicKey" },
+        { "name": "bidder", "type": "publicKey" },
+        { "name": "deposit", "type": "u64" }
+      ]
+    },
+    {
+      "name": "BidAccepted",
+      "fields": [
+        { "name": "bid", "type": "publicKey" },
+        { "name": "task", "type": "publicKey" },
+        { "name": "winner", "type": "publicKey" },
+        { "name": "slashedDeposit", "type": "u64" }
+      ]
+    },
+    {
+      "name": "BidRejected",
+      "fields": [
+        { "name": "bid", "type": "publicKey" },
+        { "name": "bidder", "type": "publicKey" }
+      ]
+    }
+  ],
+  "errors": [
+    { "code": 300, "name": "InvalidTaskState", "msg": "Task is not in the expected state" },
+    { "code": 301, "name": "TaskAlreadyAssigned", "msg": "Task is already assigned" },
+    { "code": 302, "name": "TaskAlreadyCompleted", "msg": "Task has already been completed" },
+    { "code": 303, "name": "NotTaskCreator", "msg": "Caller is not the task creator" },
+    { "code": 304, "name": "NotTaskWorker", "msg": "Caller is not the assigned worker" },
+    { "code": 305, "name": "DeadlineExceeded", "msg": "Task deadline has passed" },
+    { "code": 306, "name": "VerificationDeadlineExceeded", "msg": "Verification deadline has passed" },
+    { "code": 307, "name": "InsufficientEscrowFunds", "msg": "Insufficient reward funds in escrow" },
+    { "code": 308, "name": "InvalidReputation", "msg": "Invalid reputation score" },
+    { "code": 309, "name": "InsufficientTier", "msg": "Agent tier too low for this task" },
+    { "code": 310, "name": "MissingRequiredSkill", "msg": "Agent does not have required skills" },
+    { "code": 311, "name": "SelfAssignmentNotAllowed", "msg": "Creator cannot assign task to self" },
+    { "code": 312, "name": "ZeroReward", "msg": "Reward amount must be greater than zero" },
+    { "code": 313, "name": "TaskNotFound", "msg": "Task account not found" },
+    { "code": 314, "name": "EscrowNotFound", "msg": "Escrow account not found" },
+    { "code": 315, "name": "ArithmeticOverflow", "msg": "Arithmetic overflow occurred" },
+    { "code": 316, "name": "FeeCalculationError", "msg": "Fee calculation error" },
+    { "code": 317, "name": "TransferFailed", "msg": "Failed to transfer lamports" },
+    { "code": 318, "name": "AccountMismatch", "msg": "Account mismatch" },
+    { "code": 319, "name": "BidAlreadyExists", "msg": "Bid already exists for this task and worker" },
+    { "code": 320, "name": "BidNotFound", "msg": "Bid not found" },
+    { "code": 321, "name": "InsufficientBidDeposit", "msg": "Worker does not have enough funds for bid deposit" },
+    { "code": 322, "name": "BidDepositTooSmall", "msg": "Bid deposit too small" }
+  ],
+  "metadata": {
+    "address": "EzZB9K4JVeFDczc4tRy78uR6JAiQazHhsY7MvY3B2Q2C"
+  }
+}

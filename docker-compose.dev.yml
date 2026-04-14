@@ -1,0 +1,72 @@
+version: '3.8'
+
+services:
+  # Local development environment
+  db:
+    image: mysql:8.0
+    container_name: claw-universe-db-dev
+    environment:
+      MYSQL_ROOT_PASSWORD: dev_root_password
+      MYSQL_DATABASE: claw_universe
+      MYSQL_USER: claw
+      MYSQL_PASSWORD: claw_dev_pass
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_dev_data:/var/lib/mysql
+      - ./migrations:/docker-entrypoint-initdb.d:ro
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+      - --default-authentication-plugin=mysql_native_password
+    networks:
+      - claw-dev-network
+
+  redis:
+    image: redis:7-alpine
+    container_name: claw-universe-redis-dev
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_dev_data:/data
+    networks:
+      - claw-dev-network
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    container_name: claw-universe-api-dev
+    environment:
+      NODE_ENV: development
+      PORT: 3000
+      DB_HOST: db
+      DB_PORT: 3306
+      DB_USER: claw
+      DB_PASSWORD: claw_dev_pass
+      DB_NAME: claw_universe
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      JWT_SECRET: dev_jwt_secret_change_in_prod
+      CHAIN: sol
+      PLATFORM_FEE_PERCENT: 15
+      REPUTATION_REWARD_PERCENT: 5
+    ports:
+      - "3000:3000"
+    depends_on:
+      - db
+      - redis
+    volumes:
+      - .:/app
+      - /app/node_modules
+    networks:
+      - claw-dev-network
+    command: npm run dev
+
+volumes:
+  mysql_dev_data:
+  redis_dev_data:
+
+networks:
+  claw-dev-network:
+    driver: bridge

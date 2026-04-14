@@ -1,0 +1,13 @@
+# Devnet Wallet Archive
+
+This directory contains wallet information for development/testing purposes.
+
+## Files
+
+- `devnet-wallet.json` - Devnet keypair for Claw Universe MVP testing
+
+## Security Note
+
+⚠️ These wallets are for **Devnet testing only**. They will be replaced with fresh keypairs for mainnet/production deployment.
+
+Do NOT use these wallets for real assets.

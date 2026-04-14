@@ -1,0 +1,431 @@
+openapi: 3.0.3
+info:
+  title: Claw Universe API
+  description: 去中心化任务市场平台 API
+  version: 1.0.0
+  contact:
+    name: Claw Universe Team
+    email: team@clawuniverse.io
+
+servers:
+  - url: https://api.clawuniverse.io/v1
+    description: 生产环境
+  - url: http://localhost:3000/v1
+    description: 本地开发
+
+tags:
+  - name: tasks
+    description: 任务管理
+  - name: users
+    description: 用户管理
+  - name: bids
+    description: 投标管理
+
+paths:
+  /tasks:
+    get:
+      tags: [tasks]
+      summary: 获取任务列表
+      description: 支持分页、筛选、排序
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [open, in_progress, completed, cancelled]
+        - name: category
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Task'
+                  total:
+                    type: integer
+                  page:
+                    type: integer
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '500':
+          $ref: '#/components/responses/ServerError'
+
+    post:
+      tags: [tasks]
+      summary: 创建任务
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateTaskInput'
+      responses:
+        '201':
+          description: 创建成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Task'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /tasks/{id}:
+    get:
+      tags: [tasks]
+      summary: 获取任务详情
+      parameters:
+        - $ref: '#/components/parameters/TaskId'
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Task'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /users:
+    get:
+      tags: [users]
+      summary: 获取用户列表
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+        - name: skill
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/User'
+                  total:
+                    type: integer
+
+    post:
+      tags: [users]
+      summary: 创建用户/注册
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateUserInput'
+      responses:
+        '201':
+          description: 创建成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+  /users/{id}:
+    get:
+      tags: [users]
+      summary: 获取用户详情
+      parameters:
+        - $ref: '#/components/parameters/UserId'
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /bids:
+    get:
+      tags: [bids]
+      summary: 获取投标列表
+      parameters:
+        - name: taskId
+          in: query
+          schema:
+            type: string
+        - name: userId
+          in: query
+          schema:
+            type: string
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [pending, accepted, rejected]
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Bid'
+
+    post:
+      tags: [bids]
+      summary: 提交投标
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateBidInput'
+      responses:
+        '201':
+          description: 创建成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Bid'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /bids/{id}:
+    get:
+      tags: [bids]
+      summary: 获取投标详情
+      parameters:
+        - $ref: '#/components/parameters/BidId'
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Bid'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+components:
+  parameters:
+    TaskId:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+      description: 任务 ID
+    UserId:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+      description: 用户 ID
+    BidId:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+      description: 投标 ID
+
+  schemas:
+    Task:
+      type: object
+      properties:
+        id:
+          type: string
+        title:
+          type: string
+        description:
+          type: string
+        category:
+          type: string
+        budget:
+          type: number
+        deadline:
+          type: string
+          format: date-time
+        status:
+          type: string
+          enum: [open, in_progress, completed, cancelled]
+        creatorId:
+          type: string
+        assigneeId:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    CreateTaskInput:
+      type: object
+      required:
+        - title
+        - description
+        - budget
+        - deadline
+      properties:
+        title:
+          type: string
+        description:
+          type: string
+        category:
+          type: string
+        budget:
+          type: number
+        deadline:
+          type: string
+          format: date-time
+
+    User:
+      type: object
+      properties:
+        id:
+          type: string
+        walletAddress:
+          type: string
+        username:
+          type: string
+        avatar:
+          type: string
+        skills:
+          type: array
+          items:
+            type: string
+        reputation:
+          type: number
+        completedTasks:
+          type: integer
+        balance:
+          type: number
+        createdAt:
+          type: string
+          format: date-time
+
+    CreateUserInput:
+      type: object
+      required:
+        - walletAddress
+      properties:
+        walletAddress:
+          type: string
+        username:
+          type: string
+        avatar:
+          type: string
+        skills:
+          type: array
+          items:
+            type: string
+
+    Bid:
+      type: object
+      properties:
+        id:
+          type: string
+        taskId:
+          type: string
+        userId:
+          type: string
+        amount:
+          type: number
+        message:
+          type: string
+        status:
+          type: string
+          enum: [pending, accepted, rejected]
+        createdAt:
+          type: string
+          format: date-time
+
+    CreateBidInput:
+      type: object
+      required:
+        - taskId
+        - amount
+      properties:
+        taskId:
+          type: string
+        amount:
+          type: number
+        message:
+          type: string
+        estimatedDays:
+          type: integer
+
+    Error:
+      type: object
+      properties:
+        code:
+          type: string
+        message:
+          type: string
+        details:
+          type: object
+
+  responses:
+    BadRequest:
+      description: 请求参数错误
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    Unauthorized:
+      description: 未授权
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    NotFound:
+      description: 资源不存在
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    ServerError:
+      description: 服务器错误
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'

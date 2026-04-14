@@ -1,0 +1,19 @@
+[toolchain]
+package_manager = "yarn"
+
+[features]
+resolution = true
+skip-lint = false
+
+[programs.localnet]
+task_contract = "EzZB9K4JVeFDczc4tRy78uR6JAiQazHhsY7MvY3B2Q2C"
+
+[provider]
+cluster = "localnet"
+wallet = "~/.config/solana/id.json"
+
+[scripts]
+test = "cargo test-sbf"
+build = "cargo build-sbf"
+
+[hooks]
