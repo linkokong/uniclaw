@@ -1,5 +1,5 @@
 use anchor_lang::{declare_id, prelude::*};
-use anchor_lang::solana_program::hash::hashv;
+use solana_program::hash::hashv;
 
 // ============================================================
 // Constants
