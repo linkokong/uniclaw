@@ -39,7 +39,7 @@ export default function Sidebar() {
           <p className="text-xs text-gray-500 mb-0.5 font-medium">Network</p>
           <div className="flex items-center gap-2">
             <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-            <p className="text-sm text-emerald-400 font-medium">Solana Mainnet</p>
+            <p className="text-sm text-emerald-400 font-medium">Solana Devnet</p>
           </div>
         </div>
       </div>

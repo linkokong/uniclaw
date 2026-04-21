@@ -16,6 +16,9 @@ import { PublicKey } from '@solana/web3.js'
 
 interface BidFormProps {
   taskId: string
+  taskPda?: string  // Direct PDA address (preferred)
+  taskTitle?: string // For PDA derivation if taskPda not provided
+  creatorWallet?: string // Creator wallet for PDA derivation
   /** 典型报价范围（用于 UI 提示） */
   bidRange?: { min: number; max: number }
   /** 提交成功后回调 */
@@ -32,7 +35,7 @@ const DURATION_PRESETS = [
 ]
 
 // ─── Main BidForm Component ──────────────────────────────────────────────
-export default function BidForm({ taskId, bidRange, onSuccess }: BidFormProps) {
+export default function BidForm({ taskId, taskPda, taskTitle, creatorWallet, bidRange, onSuccess }: BidFormProps) {
   const { publicKey, signTransaction, connected } = useWallet()
 
   const [bidAmount, setBidAmount] = useState('')
@@ -62,15 +65,16 @@ export default function BidForm({ taskId, bidRange, onSuccess }: BidFormProps) {
           setLoading(false)
           return
         }
-        // taskId format: "creatorBase58:taskIndex"
-        // Derive the task PDA from the creator address embedded in taskId
-        let taskPda: PublicKey
-        if (taskId.includes(':')) {
-          const [creator] = taskId.split(':')
-          taskPda = deriveTaskPdaFromCreator(creator)
+        // Use taskPda prop if provided, otherwise derive from creatorWallet + taskTitle
+        let resolvedTaskPda: PublicKey
+        if (taskPda) {
+          resolvedTaskPda = new PublicKey(taskPda)
+        } else if (creatorWallet && taskTitle) {
+          resolvedTaskPda = deriveTaskPdaFromCreator(creatorWallet, taskTitle)
         } else {
-          // Fallback: assume taskId IS the creator address (single-task-per-creator model)
-          taskPda = deriveTaskPdaFromCreator(taskId)
+          setError('缺少任务信息，无法提交链上投标')
+          setLoading(false)
+          return
         }
         const depositLamports = Math.max(
           Math.round(numAmount * 1e9 * 0.01), // 1% of bid as deposit, min 100k lamports (refunded on task completion)
@@ -83,7 +87,7 @@ export default function BidForm({ taskId, bidRange, onSuccess }: BidFormProps) {
         }
         await submitBidOnChain(
           { publicKey, signTransaction: signTransaction as never, signAllTransactions: undefined },
-          taskPda,
+          resolvedTaskPda,
           proposal.trim(),
           depositLamports,
         )

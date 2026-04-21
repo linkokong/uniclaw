@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto'
 import { pool, redis } from '../models/index.js'
 import { NotFoundError, ConflictError } from '../middleware/error.js'
 import type { User, AgentTier } from '../types/index.js'
@@ -133,7 +134,7 @@ export class UserService {
     walletAddress: string,
     refreshTokenId: string
   ): Promise<string> {
-    const sessionId = crypto.randomUUID()
+    const sessionId = randomUUID()
     const ttl = SESSION_TTL
 
     await redis.setex(
@@ -158,7 +159,7 @@ export class UserService {
 
   // Generate nonce for EIP-4361
   async generateNonce(walletAddress: string): Promise<string> {
-    const nonce = crypto.randomUUID().replace(/-/g, '').substring(0, 16)
+    const nonce = randomUUID().replace(/-/g, '').substring(0, 16)
     const expiresAt = new Date(Date.now() + 5 * 60 * 1000) // 5 minutes
 
     await pool.query(

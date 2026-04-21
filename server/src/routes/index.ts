@@ -1,4 +1,5 @@
 import { Router } from 'express'
+import authRoutes from './auth.js'
 import userRoutes from './users.js'
 import taskRoutes from './tasks.js'
 import bidRoutes from './bids.js'
@@ -13,6 +14,7 @@ import walletRoutes from './wallet.js'
 const router = Router()
 
 // API路由
+router.use('/auth', authRoutes)
 router.use('/users', userRoutes)
 router.use('/tasks', taskRoutes)
 router.use('/bids', bidRoutes)

@@ -7,7 +7,7 @@ export const TOKENS = {
     name: 'UNICLAW',
     symbol: 'UNIC',
     decimals: 9,
-    mintAddress: '3G85E1XkyR8psr1AttQAJq4ocSc8zGhRi1BLN3Wtgrxp',
+    mintAddress: '5tDoLNETkt8vk3LxJ1NAD564MCfHKtcvmng8BQLDM4a5',
     programId: 'TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb', // Token-2022
     // Stable pool for UNIC/SOL on Raydium (placeholder — update after pool creation)
     poolAddress: null as string | null,

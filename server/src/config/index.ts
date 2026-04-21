@@ -26,9 +26,9 @@ export const config = {
 
   // Solana
   solana: {
-    rpcUrl: process.env.SOLANA_RPC_URL || 'https://api.mainnet-beta.solana.com',
+    rpcUrl: process.env.SOLANA_RPC_URL || 'https://api.devnet.solana.com',
     programId: process.env.SOLANA_PROGRAM_ID || 'EzZB9K4JVeFDczc4tRy78uR6JAiQazHhsY7MvY3B2Q2C',
-    tokenMint: process.env.SOLANA_TOKEN_MINT,
+    tokenMint: process.env.SOLANA_TOKEN_MINT || '5tDoLNETkt8vk3LxJ1NAD564MCfHKtcvmng8BQLDM4a5',
   },
 
   // Platform

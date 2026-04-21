@@ -1,4 +1,5 @@
 use anchor_lang::{declare_id, prelude::*};
+use anchor_lang::solana_program::hash::hashv;
 
 // ============================================================
 // Constants
@@ -733,12 +734,20 @@ pub struct InitializeWorkerProfile<'info> {
 }
 
 #[derive(Accounts)]
+#[instruction(title: String)]
 pub struct CreateTask<'info> {
     #[account(mut)] pub creator: Signer<'info>,
-    #[account(init, payer = creator, space = Task::space(), seeds = [TASK_SEED, creator.key().as_ref()], bump)]
+    #[account(
+        init, 
+        payer = creator, 
+        space = Task::space(), 
+        seeds = [TASK_SEED, creator.key().as_ref(), &hashv(&[title.as_bytes()]).to_bytes()[..8]], 
+        bump
+    )]
     pub task: Account<'info, Task>,
     #[account(init, payer = creator, space = TaskEscrow::space(), seeds = [ESCROW_PREFIX, task.key().as_ref()], bump)]
     pub escrow: Account<'info, TaskEscrow>,
+    pub clock: Sysvar<'info, Clock>,
     pub system_program: Program<'info, System>,
 }
 

@@ -72,18 +72,21 @@ export function toSnakeCase<T>(obj: unknown, pascalKeys: Set<string> = new Set()
 
 const BACKEND_TO_FRONTEND_STATUS: Record<BackendTaskStatus, FrontendTaskStatus> = {
   [BackendTaskStatus.Created]: 'open',
-  [BackendTaskStatus.Assigned]: 'in_progress',
+  [BackendTaskStatus.Assigned]: 'assigned',
   [BackendTaskStatus.InProgress]: 'in_progress',
-  [BackendTaskStatus.Completed]: 'in_progress', // 后端 completed=已提交，前端无此状态
+  [BackendTaskStatus.Completed]: 'submitted',    // worker 已提交，等雇主验收
   [BackendTaskStatus.Verified]: 'completed',
   [BackendTaskStatus.Cancelled]: 'cancelled',
 }
 
 const FRONTEND_TO_BACKEND_STATUS: Record<FrontendTaskStatus, BackendTaskStatus> = {
   open: BackendTaskStatus.Created,
+  assigned: BackendTaskStatus.Assigned,
   in_progress: BackendTaskStatus.InProgress,
+  submitted: BackendTaskStatus.Completed,
   completed: BackendTaskStatus.Verified,
   cancelled: BackendTaskStatus.Cancelled,
+  disputed: BackendTaskStatus.Cancelled,
 }
 
 export function mapBackendStatusToFrontend(status: string): FrontendTaskStatus {

@@ -1,20 +1,23 @@
-import { ReactNode } from 'react';
+import { ReactNode, useState } from 'react'
+import Header from './Header'
+import Sidebar from './Sidebar'
 
 interface LayoutProps {
-  children: ReactNode;
+  children: ReactNode
 }
 
 export function Layout({ children }: LayoutProps) {
+  const [sidebarOpen, setSidebarOpen] = useState(true)
+
   return (
-    <div className="min-h-screen bg-gray-50">
-      <header className="bg-white shadow">
-        <div className="max-w-7xl mx-auto px-4 py-4">
-          <h1 className="text-xl font-bold">Claw Universe</h1>
+    <div className="min-h-screen bg-bg-base text-text-primary">
+      <Header onToggleSidebar={() => setSidebarOpen(!sidebarOpen)} />
+      <Sidebar />
+      <main className={`pt-20 pb-8 transition-all duration-300 ${sidebarOpen ? 'pl-64' : 'pl-0'} px-4 md:px-8`}>
+        <div className="max-w-7xl mx-auto">
+          {children}
         </div>
-      </header>
-      <main className="max-w-7xl mx-auto px-4 py-6">
-        {children}
       </main>
     </div>
-  );
+  )
 }

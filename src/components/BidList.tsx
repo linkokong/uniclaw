@@ -5,6 +5,7 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useWallet } from '@solana/wallet-adapter-react'
+import { PublicKey } from '@solana/web3.js'
 import { getTaskBids } from '../api/task'
 import { getUserByWallet } from '../api/user'
 import { acceptBid, rejectBid } from '../api/bid'
@@ -42,6 +43,8 @@ interface BidderProfile {
 
 interface BidListProps {
   taskId: string
+  taskPda?: string  // Direct PDA address (preferred)
+  taskTitle?: string // For PDA derivation if taskPda not provided
   creatorWallet?: string
   initialBids?: RawBid[]
   /** 外部触发刷新（如投标成功后） */
@@ -378,7 +381,7 @@ function BidRow({
 
 // ─── Main BidList ───────────────────────────────────────────────────────────
 
-export default function BidList({ taskId, creatorWallet, initialBids, refreshTrigger }: BidListProps) {
+export default function BidList({ taskId, taskPda, taskTitle, creatorWallet, initialBids, refreshTrigger }: BidListProps) {
   const { publicKey, signTransaction } = useWallet()
 
   const [bids, setBids] = useState<RawBid[] | null>(initialBids ?? null)
@@ -498,16 +501,19 @@ export default function BidList({ taskId, creatorWallet, initialBids, refreshTri
   // ── Accept / Reject handlers ────────────────────────────────────────────
   const handleAccept = async (bidId: string) => {
     try {
-      if (actionMode === 'onchain' && creatorWallet && publicKey) {
-        const taskPda = deriveTaskPdaFromCreator(creatorWallet)
+      if (actionMode === 'onchain' && publicKey) {
+        const resolvedTaskPda = taskPda ? new PublicKey(taskPda) : 
+          (taskTitle && creatorWallet) ? deriveTaskPdaFromCreator(creatorWallet, taskTitle) :
+          undefined
+        if (!resolvedTaskPda) throw new Error('Task PDA required for on-chain operations')
         const bidderWallet = bids?.find(b => b.id === bidId)?.bidder_wallet
         if (!bidderWallet) throw new Error('Bid not found')
-        const bidPda = deriveBidPda(taskPda, bidderWallet)
+        const bidPda = deriveBidPda(resolvedTaskPda, bidderWallet)
         const workerProfile = deriveWorkerProfilePda(bidderWallet)
         await acceptBidOnChain(
           { publicKey, signTransaction: signTransaction as never, signAllTransactions: undefined },
           bidPda,
-          taskPda,
+          resolvedTaskPda,
           workerProfile,
         )
       } else {
@@ -537,16 +543,18 @@ export default function BidList({ taskId, creatorWallet, initialBids, refreshTri
 
   const handleReject = async (bidId: string) => {
     try {
-      if (actionMode === 'onchain' && creatorWallet && publicKey) {
+      if (actionMode === 'onchain' && publicKey) {
         const bid = bids?.find(b => b.id === bidId)
         if (!bid) throw new Error('Bid not found')
-        const taskPda = deriveTaskPdaFromCreator(creatorWallet)
-        const bidPda = deriveBidPda(taskPda, bid.bidder_wallet)
-        const { PublicKey } = await import('@solana/web3.js')
+        const resolvedTaskPda = taskPda ? new PublicKey(taskPda) : 
+          (taskTitle && creatorWallet) ? deriveTaskPdaFromCreator(creatorWallet, taskTitle) :
+          undefined
+        if (!resolvedTaskPda) throw new Error('Task PDA required for on-chain operations')
+        const bidPda = deriveBidPda(resolvedTaskPda, bid.bidder_wallet)
         await rejectBidOnChain(
           { publicKey, signTransaction: signTransaction as never, signAllTransactions: undefined },
           bidPda,
-          taskPda,
+          resolvedTaskPda,
           new PublicKey(bid.bidder_wallet),
         )
       } else {

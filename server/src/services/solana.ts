@@ -5,7 +5,6 @@ import {
   SystemProgram,
   LAMPORTS_PER_SOL,
 } from '@solana/web3.js'
-import { verify } from '@noble/ed25519'
 import { config } from '../config/index.js'
 import { pool } from '../models/index.js'
 import { SolanaError } from '../middleware/error.js'
@@ -107,6 +106,7 @@ export class SolanaService {
     walletAddress: string
   ): Promise<boolean> {
     try {
+      const { verify } = await import('@noble/ed25519')
       const messageBytes = new TextEncoder().encode(message)
       const signatureBytes = Buffer.from(signature, 'base64')
       const publicKeyBytes = new PublicKey(walletAddress).toBytes()
@@ -114,6 +114,45 @@ export class SolanaService {
       return isValid
     } catch {
       return false
+    }
+  }
+
+  // Get SPL token balance (e.g. UNIC) for a wallet
+  async getUnicBalance(walletAddress: string, mintAddress: string): Promise<string> {
+    try {
+      const publicKey = new PublicKey(walletAddress)
+      const mint = new PublicKey(mintAddress)
+      // Fetch all SPL token accounts owned by this wallet
+      const tokenAccounts = await this.connection.getTokenAccountsByOwner(publicKey, {
+        programId: new PublicKey('TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA'),
+      })
+      // Find the account matching the UNIC mint
+      const unicAccount = tokenAccounts.value.find(acc => {
+        const mintFromAccount = (acc.account.data as any).parsed?.info?.mint
+        return mintFromAccount === mintAddress
+      })
+      if (!unicAccount) return '0'
+      const amount = (unicAccount.account.data as any).parsed?.info?.tokenAmount?.uiAmountString ?? '0'
+      return String(amount)
+    } catch (error) {
+      throw new SolanaError('Failed to fetch UNIC balance', error)
+    }
+  }
+
+  // Relay a signed transaction from frontend Phantom wallet to Solana Devnet
+  async relayTransaction(signedTxBase64: string): Promise<string> {
+    try {
+      const txBuffer = Buffer.from(signedTxBase64, 'base64')
+      const signature = await this.connection.sendRawTransaction(txBuffer, {
+        skipPreflight: false,
+        preflightCommitment: 'confirmed',
+      })
+      // Wait for confirmation
+      await this.connection.confirmTransaction(signature, 'confirmed')
+      return signature
+    } catch (error) {
+      console.error('[solanaService] relayTransaction error:', error)
+      throw new SolanaError('Failed to relay transaction to Solana', error)
     }
   }
 

@@ -42,7 +42,13 @@ router.get('/leaderboard',
   userController.getLeaderboard
 )
 
-// GET /users/:wallet - 根据钱包地址获取用户信息（可选认证）
+// 以下路由需要认证（必须在 /:wallet 之前注册，否则 /me 被当成钱包地址）
+router.use(authenticateJWT)
+
+// GET /users/me - 获取当前用户信息
+router.get('/me', userController.getMe)
+
+// GET /users/:wallet - 根据钱包地址获取用户信息（需要认证）
 router.get('/:wallet',
   [
     param('wallet')
@@ -50,11 +56,10 @@ router.get('/:wallet',
       .withMessage('Invalid Solana wallet address'),
     handleValidationErrors
   ],
-  optionalAuth,
   userController.getByWallet
 )
 
-// GET /users/:id - 根据用户ID获取用户信息（可选认证）
+// GET /users/id/:id - 根据用户ID获取用户信息（需要认证）
 router.get('/id/:id',
   [
     param('id')
@@ -62,15 +67,8 @@ router.get('/id/:id',
       .withMessage('User ID must be a positive integer'),
     handleValidationErrors
   ],
-  optionalAuth,
   userController.getById
 )
-
-// 以下路由需要认证
-router.use(authenticateJWT)
-
-// GET /users/me - 获取当前用户信息
-router.get('/me', userController.getMe)
 
 // PATCH /users/me - 更新当前用户资料
 router.patch('/me',

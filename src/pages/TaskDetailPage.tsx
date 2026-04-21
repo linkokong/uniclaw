@@ -3,8 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom'
 import { useWallet } from '@solana/wallet-adapter-react'
 import { PublicKey } from '@solana/web3.js'
 import { getTaskDetail } from '../api/task'
-import { createBid } from '../api/bid'
-import { fetchTask } from '../api/anchorClient'
+import { fetchTask, verifyTask, startTask, submitTask, disputeTask, acceptBid, rejectBid, submitBid } from '../api/anchorClient'
 import type { Task, RawBid } from '../types/api'
 import { BidStatus } from '../types/api'
 
@@ -14,17 +13,20 @@ const PROGRAM_ID = new PublicKey('EzZB9K4JVeFDczc4tRy78uR6JAiQazHhsY7MvY3B2Q2C')
 // Reserved for inline status display in future UI iterations
 // Re-exported for external use
 export function _StatusBadge({ status }: { status: Task['status'] }) {
-  const cfg = {
+  const cfg: Record<string, { label: string; bg: string; text: string; dot: string }> = {
     open:        { label: 'OPEN',        bg: 'bg-emerald-500/15', text: 'text-emerald-400', dot: 'bg-emerald-400' },
-    in_progress: { label: 'IN PROGRESS', bg: 'bg-yellow-500/15',  text: 'text-yellow-400',  dot: 'bg-yellow-400' },
+    assigned:    { label: 'ASSIGNED',    bg: 'bg-blue-500/15',    text: 'text-blue-400',    dot: 'bg-blue-400' },
+    in_progress: { label: 'WORKING',    bg: 'bg-yellow-500/15',  text: 'text-yellow-400',  dot: 'bg-yellow-400' },
+    submitted:   { label: 'SUBMITTED',  bg: 'bg-orange-500/15',  text: 'text-orange-400',  dot: 'bg-orange-400' },
     completed:   { label: 'COMPLETED',   bg: 'bg-gray-500/15',    text: 'text-gray-400',     dot: 'bg-gray-400' },
-    cancelled:   { label: 'CANCELLED',   bg: 'bg-red-500/15',      text: 'text-red-400',      dot: 'bg-red-400' },
-  }[status] ?? { label: 'UNKNOWN', bg: 'bg-gray-500/15', text: 'text-gray-400', dot: 'bg-gray-400' }
+    cancelled:   { label: 'CANCELLED',  bg: 'bg-red-500/15',     text: 'text-red-400',      dot: 'bg-red-400' },
+  }
+  const c = cfg[status] ?? { label: 'UNKNOWN', bg: 'bg-gray-500/15', text: 'text-gray-400', dot: 'bg-gray-400' }
 
   return (
-    <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium ${cfg.bg} ${cfg.text}`}>
-      <span className={`w-1.5 h-1.5 rounded-full ${cfg.dot}`} />
-      {cfg.label}
+    <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium ${c.bg} ${c.text}`}>
+      <span className={`w-1.5 h-1.5 rounded-full ${c.dot}`} />
+      {c.label}
     </span>
   )
 }
@@ -73,11 +75,67 @@ const BID_STATUS_CONFIG: Record<BidStatus, { label: string; bg: string; text: st
   withdrawn: { label: 'Withdrawn', bg: 'bg-gray-700/15',    text: 'text-gray-500' },
 }
 
-function BidRow({ bid, isOwner }: { bid: RawBid; isOwner: boolean }) {
+function BidRow({ bid, isOwner, onAction }: { bid: RawBid; isOwner: boolean; onAction: () => void }) {
+  const wallet = useWallet()
+  const [actionLoading, setActionLoading] = useState(false)
   const cfg = BID_STATUS_CONFIG[bid.status] ?? BID_STATUS_CONFIG.pending
   const shortAddr = bid.bidder_wallet
     ? `${bid.bidder_wallet.slice(0, 6)}…${bid.bidder_wallet.slice(-4)}`
     : '—'
+
+  const handleAccept = async () => {
+    if (!wallet.connected || !wallet.publicKey || !wallet.signTransaction) return
+    setActionLoading(true)
+    try {
+      const taskPDA = new PublicKey(bid.task_id || '')
+      const bidderPubkey = new PublicKey(bid.bidder_wallet || '')
+      const workerProfile = PublicKey.findProgramAddressSync(
+        [Buffer.from('agent_profile'), bidderPubkey.toBuffer()],
+        PROGRAM_ID
+      )[0]
+      // bid PDA: derive from bidder + task
+      const [bidPda] = PublicKey.findProgramAddressSync(
+        [Buffer.from('bid'), bidderPubkey.toBuffer(), taskPDA.toBuffer()],
+        PROGRAM_ID
+      )
+      await acceptBid(
+        { signTransaction: wallet.signTransaction, publicKey: wallet.publicKey },
+        bidPda,
+        taskPDA,
+        workerProfile
+      )
+      onAction()
+    } catch (err: any) {
+      alert(err.message || 'Accept bid failed')
+    } finally {
+      setActionLoading(false)
+    }
+  }
+
+  const handleReject = async () => {
+    if (!wallet.connected || !wallet.publicKey || !wallet.signTransaction) return
+    setActionLoading(true)
+    try {
+      const taskPDA = new PublicKey(bid.task_id || '')
+      const bidderPubkey = new PublicKey(bid.bidder_wallet || '')
+      // bid PDA: derive from bidder + task
+      const [bidPda] = PublicKey.findProgramAddressSync(
+        [Buffer.from('bid'), bidderPubkey.toBuffer(), taskPDA.toBuffer()],
+        PROGRAM_ID
+      )
+      await rejectBid(
+        { signTransaction: wallet.signTransaction, publicKey: wallet.publicKey },
+        bidPda,
+        taskPDA,
+        bidderPubkey
+      )
+      onAction()
+    } catch (err: any) {
+      alert(err.message || 'Reject bid failed')
+    } finally {
+      setActionLoading(false)
+    }
+  }
 
   return (
     <div className="flex items-center justify-between py-3 border-b border-gray-800/40 last:border-0">
@@ -97,11 +155,19 @@ function BidRow({ bid, isOwner }: { bid: RawBid; isOwner: boolean }) {
         <span className="text-sm font-semibold text-[#14F195]">{parseFloat(bid.amount)} SOL</span>
         {isOwner && bid.status === 'pending' && (
           <div className="flex gap-2">
-            <button className="px-3 py-1 bg-emerald-500/20 text-emerald-400 rounded-lg text-xs hover:bg-emerald-500/30 transition-colors">
-              Accept
+            <button
+              onClick={handleAccept}
+              disabled={actionLoading}
+              className="px-3 py-1 bg-emerald-500/20 text-emerald-400 rounded-lg text-xs hover:bg-emerald-500/30 transition-colors disabled:opacity-50"
+            >
+              {actionLoading ? '...' : 'Accept'}
             </button>
-            <button className="px-3 py-1 bg-red-500/20 text-red-400 rounded-lg text-xs hover:bg-red-500/30 transition-colors">
-              Reject
+            <button
+              onClick={handleReject}
+              disabled={actionLoading}
+              className="px-3 py-1 bg-red-500/20 text-red-400 rounded-lg text-xs hover:bg-red-500/30 transition-colors disabled:opacity-50"
+            >
+              {actionLoading ? '...' : 'Reject'}
             </button>
           </div>
         )}
@@ -111,7 +177,7 @@ function BidRow({ bid, isOwner }: { bid: RawBid; isOwner: boolean }) {
 }
 
 // ─── Bids Section ─────────────────────────────────────────────────────────
-function BidsSection({ bids, isOwner }: { bids: RawBid[]; isOwner: boolean }) {
+function BidsSection({ bids, isOwner, onAction }: { bids: RawBid[]; isOwner: boolean; onAction: () => void }) {
   return (
     <div className="bg-[#111827] border border-gray-800/70 rounded-2xl p-5">
       <div className="flex items-center justify-between mb-4">
@@ -123,7 +189,7 @@ function BidsSection({ bids, isOwner }: { bids: RawBid[]; isOwner: boolean }) {
       ) : (
         <div>
           {bids.map((bid) => (
-            <BidRow key={bid.id} bid={bid} isOwner={isOwner} />
+            <BidRow key={bid.id} bid={bid} isOwner={isOwner} onAction={onAction} />
           ))}
         </div>
       )}
@@ -132,14 +198,14 @@ function BidsSection({ bids, isOwner }: { bids: RawBid[]; isOwner: boolean }) {
 }
 
 // ─── Place Bid Form ───────────────────────────────────────────────────────
-function PlaceBidForm({ taskId: _taskId, reward, bidRange, onSuccess, connected }: {
+function PlaceBidForm({ taskId, reward, bidRange, onSuccess, connected }: {
   connected: boolean
   taskId: string
   reward: number
   bidRange: { min: number; max: number }
   onSuccess: () => void
 }) {
-  // const { connected } = useWallet()
+  const wallet = useWallet()
   const [amount, setAmount] = useState('')
   const [proposal, setProposal] = useState('')
   const [duration, setDuration] = useState('3')
@@ -149,15 +215,20 @@ function PlaceBidForm({ taskId: _taskId, reward, bidRange, onSuccess, connected 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!amount || !proposal) return
+    if (!wallet.connected || !wallet.publicKey || !wallet.signTransaction) {
+      setError('Wallet not connected')
+      return
+    }
     setLoading(true)
     setError(null)
     try {
-      await createBid({
-        task_id: _taskId,
-        amount,
+      const depositLamports = Math.round(parseFloat(amount) * 1_000_000_000)
+      await submitBid(
+        { signTransaction: wallet.signTransaction, publicKey: wallet.publicKey },
+        new PublicKey(taskId),
         proposal,
-        estimated_duration: duration,
-      })
+        depositLamports
+      )
       onSuccess()
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to submit bid')
@@ -314,7 +385,9 @@ function ErrorState({ message, onRetry }: { message: string; onRetry: () => void
 export default function TaskDetailPage() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
-  const { publicKey, connected: walletConnected } = useWallet()
+  const wallet = useWallet()
+  const publicKey = wallet.publicKey
+  const walletConnected = wallet.connected
 
   const [task, setTask] = useState<Task | null>(null)
   const [bids, setBids] = useState<RawBid[]>([])
@@ -366,11 +439,14 @@ export default function TaskDetailPage() {
   const deadlineColor =
     daysLeft <= 3 ? 'text-red-400' : daysLeft <= 7 ? 'text-yellow-400' : 'text-gray-400'
 
-  const statusConfig = {
+  const statusConfig: Record<string, any> = {
     open:        { bg: 'bg-emerald-500/15', text: 'text-emerald-400', dot: 'bg-emerald-400', label: 'OPEN' },
-    in_progress: { bg: 'bg-yellow-500/15', text: 'text-yellow-400', dot: 'bg-yellow-400', label: 'IN PROGRESS' },
-    completed:   { bg: 'bg-gray-500/15', text: 'text-gray-400', dot: 'bg-gray-400', label: 'COMPLETED' },
-    cancelled:   { bg: 'bg-red-500/15', text: 'text-red-400', dot: 'bg-red-400', label: 'CANCELLED' },
+    assigned:    { bg: 'bg-blue-500/15',    text: 'text-blue-400',    dot: 'bg-blue-400',    label: 'ASSIGNED' },
+    in_progress: { bg: 'bg-yellow-500/15', text: 'text-yellow-400', dot: 'bg-yellow-400', label: 'WORKING' },
+    submitted:   { bg: 'bg-orange-500/15',  text: 'text-orange-400',  dot: 'bg-orange-400', label: 'SUBMITTED' },
+    completed:   { bg: 'bg-gray-500/15',   text: 'text-gray-400',    dot: 'bg-gray-400',    label: 'COMPLETED' },
+    cancelled:   { bg: 'bg-red-500/15',    text: 'text-red-400',     dot: 'bg-red-400',     label: 'CANCELLED' },
+    disputed:    { bg: 'bg-orange-500/15', text: 'text-orange-400',  dot: 'bg-orange-400',  label: 'DISPUTED' },
   }[task.status] ?? { bg: 'bg-gray-500/15', text: 'text-gray-400', dot: 'bg-gray-400', label: 'UNKNOWN' }
 
   return (
@@ -471,23 +547,83 @@ export default function TaskDetailPage() {
           )}
 
           {/* Bids */}
-          <BidsSection bids={bids} isOwner={!!isOwner} />
+          <BidsSection bids={bids} isOwner={!!isOwner} onAction={fetchData} />
         </div>
 
         {/* ── Right Column ── */}
         <div className="space-y-4">
 
-          {/* Worker Action Button - show when in_progress (worker already assigned) */}
-          {/* TODO: Connect to chain when worker field added to Task type */}
-          {/* {task.status === 'in_progress' && publicKey && task.worker?.address === publicKey.toBase58() && ( */}
+          {/* Start Working Button - worker accepts assignment */}
+          {task.status === 'assigned' && wallet.connected && (
+            <button
+              onClick={async () => {
+                if (!wallet.connected || !wallet.publicKey) return
+                try {
+                  const taskPDA = new PublicKey(task.id)
+                  await startTask(
+                    { signTransaction: wallet.signTransaction!, publicKey: wallet.publicKey! },
+                    taskPDA
+                  )
+                  fetchData()
+                  alert('Task started!')
+                } catch (err: any) {
+                  alert(err.message || 'Start failed')
+                }
+              }}
+              className="w-full bg-gradient-to-r from-[#9945FF] to-[#14F195] text-white font-semibold py-3 rounded-xl hover:opacity-90 transition-all"
+            >
+              🚀 Start Working
+            </button>
+          )}
 
-          {/* Creator Verify Buttons */}
-          {task.status === 'completed' && isOwner && (
+          {/* Submit Task Button - worker submits completed work */}
+          {task.status === 'in_progress' && wallet.connected && (
+            <button
+              onClick={async () => {
+                if (!wallet.connected || !wallet.publicKey) return
+                try {
+                  const taskPDA = new PublicKey(task.id)
+                  await submitTask(
+                    { signTransaction: wallet.signTransaction!, publicKey: wallet.publicKey! },
+                    taskPDA
+                  )
+                  fetchData()
+                  alert('Task submitted for review!')
+                } catch (err: any) {
+                  alert(err.message || 'Submit failed')
+                }
+              }}
+              className="w-full bg-gradient-to-r from-[#9945FF] to-[#14F195] text-white font-semibold py-3 rounded-xl hover:opacity-90 transition-all"
+            >
+              📤 Submit for Review
+            </button>
+          )}
+
+          {/* Creator Verify Buttons - only when worker submitted (awaiting verification) */}
+          {task.status === 'submitted' && isOwner && (
             <div className="flex gap-2">
               <button
                 onClick={async () => {
-                  // TODO: Call verifyTask(approved=true)
-                  console.log('Verify approve:', task.id)
+                  if (!wallet.connected || !wallet.publicKey) return
+                  const workerAddr = task.worker?.address
+                  if (!workerAddr) { alert('No worker assigned'); return }
+                  try {
+                    const taskPDA = new PublicKey(task.id)
+                    const workerPubkey = new PublicKey(workerAddr)
+                    await verifyTask(
+                      { signTransaction: wallet.signTransaction!, publicKey: wallet.publicKey! },
+                      taskPDA,
+                      workerPubkey,
+                      PublicKey.findProgramAddressSync(
+                        [Buffer.from('agent_profile'), workerPubkey.toBuffer()],
+                        PROGRAM_ID
+                      )[0],
+                      true
+                    )
+                    fetchData()
+                  } catch (err: any) {
+                    alert(err.message || 'Approve failed')
+                  }
                 }}
                 className="flex-1 bg-green-500/20 text-green-400 font-semibold py-3 rounded-xl hover:bg-green-500/30 transition-all"
               >
@@ -495,8 +631,26 @@ export default function TaskDetailPage() {
               </button>
               <button
                 onClick={async () => {
-                  // TODO: Call verifyTask(approved=false)
-                  console.log('Verify reject:', task.id)
+                  if (!wallet.connected || !wallet.publicKey) return
+                  const workerAddr = task.worker?.address
+                  if (!workerAddr) { alert('No worker assigned'); return }
+                  try {
+                    const taskPDA = new PublicKey(task.id)
+                    const workerPubkey = new PublicKey(workerAddr)
+                    await verifyTask(
+                      { signTransaction: wallet.signTransaction!, publicKey: wallet.publicKey! },
+                      taskPDA,
+                      workerPubkey,
+                      PublicKey.findProgramAddressSync(
+                        [Buffer.from('agent_profile'), workerPubkey.toBuffer()],
+                        PROGRAM_ID
+                      )[0],
+                      false
+                    )
+                    fetchData()
+                  } catch (err: any) {
+                    alert(err.message || 'Reject failed')
+                  }
                 }}
                 className="flex-1 bg-red-500/20 text-red-400 font-semibold py-3 rounded-xl hover:bg-red-500/30 transition-all"
               >
@@ -505,13 +659,28 @@ export default function TaskDetailPage() {
             </div>
           )}
 
-          {/* Dispute Button - show when completed and deadline passed */}
-          {task.status === 'completed' && task.verification_deadline && new Date(task.verification_deadline).getTime() < Date.now() && (
+          {/* Dispute Button - show when submitted and deadline passed */}
+          {task.status === 'submitted' && task.verification_deadline && new Date(task.verification_deadline).getTime() < Date.now() && wallet.connected && (
             <button
               onClick={async () => {
-                // TODO: Call disputeTask on chain
-                console.log('Dispute:', task.id)
-                alert('Dispute functionality - connect to chain')
+                if (!wallet.connected || !wallet.publicKey) return
+                if (!confirm('Start dispute? This will involve platform arbitration.')) return
+                try {
+                  const taskPDA = new PublicKey(task.id)
+                  const workerProfile = PublicKey.findProgramAddressSync(
+                    [Buffer.from('agent_profile'), wallet.publicKey.toBuffer()],
+                    PROGRAM_ID
+                  )[0]
+                  await disputeTask(
+                    { signTransaction: wallet.signTransaction!, publicKey: wallet.publicKey! },
+                    taskPDA,
+                    workerProfile
+                  )
+                  fetchData()
+                  alert('Dispute submitted!')
+                } catch (err: any) {
+                  alert(err.message || 'Dispute failed')
+                }
               }}
               className="w-full bg-orange-500/20 text-orange-400 font-semibold py-3 rounded-xl hover:bg-orange-500/30 transition-all"
             >

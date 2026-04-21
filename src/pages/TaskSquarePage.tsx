@@ -1,77 +1,8 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useWallet } from '@solana/wallet-adapter-react'
 import { Link } from 'react-router-dom'
-
-// ─── Mock Data ────────────────────────────────────────────────────────────
-interface Task {
-  id: string
-  title: string
-  description: string
-  reward: number
-  status: 'open' | 'in_progress' | 'completed'
-  deadline: string
-  category: string
-  bids: number
-  skills: string[]
-}
-
-const mockTasks: Task[] = [
-  {
-    id: '1',
-    title: 'AI Article Writer Agent',
-    description: 'Create a React agent that writes tech articles on Solana ecosystem. Must integrate with GPT-4 and support markdown export.',
-    reward: 5,
-    status: 'open',
-    deadline: '2026-04-15',
-    category: 'AI Agent',
-    bids: 3,
-    skills: ['React', 'TypeScript', 'OpenAI API'],
-  },
-  {
-    id: '2',
-    title: 'DeFi Analytics Dashboard',
-    description: 'Build a real-time dashboard for tracking DeFi protocols on Solana with portfolio tracking and yield comparisons.',
-    reward: 10,
-    status: 'open',
-    deadline: '2026-04-20',
-    category: 'Development',
-    bids: 7,
-    skills: ['React', 'Web3', 'Chart.js'],
-  },
-  {
-    id: '3',
-    title: 'Social Media Bot',
-    description: 'Automated Twitter bot for crypto news aggregation with sentiment analysis and auto-post capabilities.',
-    reward: 3,
-    status: 'in_progress',
-    deadline: '2026-04-10',
-    category: 'Automation',
-    bids: 5,
-    skills: ['Python', 'Twitter API', 'NLP'],
-  },
-  {
-    id: '4',
-    title: 'NFT Marketplace Frontend',
-    description: 'Design and build a modern NFT marketplace UI with wallet integration and lazy minting support.',
-    reward: 8,
-    status: 'open',
-    deadline: '2026-04-25',
-    category: 'Development',
-    bids: 12,
-    skills: ['React', 'Solana SDK', 'CSS'],
-  },
-  {
-    id: '5',
-    title: 'Trading Signal Bot',
-    description: 'Build an automated bot that monitors DEX pools and sends trading signals to a Discord channel.',
-    reward: 6,
-    status: 'open',
-    deadline: '2026-04-18',
-    category: 'Automation',
-    bids: 4,
-    skills: ['Python', 'Solana RPC', 'Discord API'],
-  },
-]
+// fetchAllTasks removed — using fetchAllTasksWithPdas directly
+import { chainTaskToTask, Task } from '../types/api'
 
 // ─── Filter Types ─────────────────────────────────────────────────────────
 type TaskType = 'all' | 'open' | 'in_progress'
@@ -80,16 +11,19 @@ type SortBy = 'newest' | 'deadline' | 'reward' | 'bids'
 
 // ─── Status Badge ─────────────────────────────────────────────────────────
 function StatusBadge({ status }: { status: Task['status'] }) {
-  const config = {
-    open: { label: 'OPEN', bg: 'bg-emerald-500/15', text: 'text-emerald-400', dot: 'bg-emerald-400' },
-    in_progress: { label: 'IN PROGRESS', bg: 'bg-yellow-500/15', text: 'text-yellow-400', dot: 'bg-yellow-400' },
-    completed: { label: 'COMPLETED', bg: 'bg-gray-500/15', text: 'text-gray-400', dot: 'bg-gray-400' },
-  }[status]
-
+  const config: Record<string, { label: string; bg: string; text: string; dot: string }> = {
+    open:       { label: 'OPEN',        bg: 'bg-emerald-500/15', text: 'text-emerald-400', dot: 'bg-emerald-400' },
+    in_progress:{ label: 'IN PROGRESS', bg: 'bg-yellow-500/15',  text: 'text-yellow-400',  dot: 'bg-yellow-400' },
+    submitted:  { label: 'SUBMITTED',   bg: 'bg-blue-500/15',     text: 'text-blue-400',     dot: 'bg-blue-400' },
+    completed:  { label: 'COMPLETED',   bg: 'bg-gray-500/15',    text: 'text-gray-400',     dot: 'bg-gray-400' },
+    cancelled:  { label: 'CANCELLED',   bg: 'bg-gray-500/15',    text: 'text-gray-500',     dot: 'bg-gray-500' },
+    disputed:  { label: 'DISPUTED',    bg: 'bg-red-500/15',     text: 'text-red-400',      dot: 'bg-red-400' },
+  }
+  const c = config[status] ?? { label: status.toUpperCase(), bg: 'bg-gray-500/15', text: 'text-gray-400', dot: 'bg-gray-400' }
   return (
-    <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium ${config.bg} ${config.text}`}>
-      <span className={`w-1.5 h-1.5 rounded-full ${config.dot}`} />
-      {config.label}
+    <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium ${c.bg} ${c.text}`}>
+      <span className={`w-1.5 h-1.5 rounded-full ${c.dot}`} />
+      {c.label}
     </span>
   )
 }
@@ -107,7 +41,7 @@ function SkillTag({ label }: { label: string }) {
 function CategoryBadge({ label }: { label: string }) {
   return (
     <span className="px-2.5 py-1 bg-gray-800/60 border border-gray-700/50 rounded-lg text-xs text-gray-400">
-      {label}
+      {label || 'General'}
     </span>
   )
 }
@@ -129,19 +63,15 @@ function FilterPill({ active, onClick, children }: { active: boolean; onClick: (
 }
 
 // ─── Primary Button ───────────────────────────────────────────────────────
-function PrimaryBtn({ children, disabled, onClick }: { children: React.ReactNode; disabled?: boolean; onClick?: () => void }) {
+function PrimaryBtn({ children, disabled }: { children: React.ReactNode; disabled?: boolean }) {
   return (
-    <button
-      onClick={onClick}
-      disabled={disabled}
-      className={`px-5 py-2.5 rounded-xl text-sm font-semibold transition-all duration-200 ${
-        disabled
-          ? 'bg-gray-700/50 text-gray-500 cursor-not-allowed'
-          : 'bg-gradient-to-r from-[#9945FF] to-[#14F195] text-white hover:opacity-90 hover:shadow-lg hover:shadow-purple-500/20 active:scale-95'
-      }`}
-    >
+    <span className={`inline-block px-5 py-2.5 rounded-xl text-sm font-semibold transition-all duration-200 ${
+      disabled
+        ? 'bg-gray-700/50 text-gray-500 cursor-not-allowed'
+        : 'bg-gradient-to-r from-[#9945FF] to-[#14F195] text-white opacity-90'
+    }`}>
       {children}
-    </button>
+    </span>
   )
 }
 
@@ -222,7 +152,7 @@ function SortFilter({ value, onChange }: { value: SortBy; onChange: (v: SortBy) 
     <select
       value={value}
       onChange={(e) => onChange(e.target.value as SortBy)}
-      className="px-3 py-2 bg-gray-900/70 border border-gray-700/50 rounded-lg text-sm text-gray-300 focus:outline-none focus:border-[#9945FF]/50 cursor-pointer hover:bg-gray-800/70 transition-colors"
+      className="px-3 py-2 bg-gray-900/70 border border-gray-700/50 rounded-lg text-sm text-gray-300 focus:outline-none focus:border-[#9945FF]/50 cursor-pointer hover:bg-gray-800/70 transition-colors appearance-none"
       style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%239ca3af' d='M6 8L1 3h10z'/%3E%3C/svg%3E")`, backgroundRepeat: 'no-repeat', backgroundPosition: 'right 10px center', paddingRight: '28px' }}
     >
       {options.map((o) => (
@@ -236,8 +166,8 @@ function SortFilter({ value, onChange }: { value: SortBy; onChange: (v: SortBy) 
 function TaskCard({ task }: { task: Task }) {
   const { connected } = useWallet()
   const isOpen = task.status === 'open'
-
-  const daysLeft = Math.ceil((new Date(task.deadline).getTime() - Date.now()) / (1000 * 60 * 60 * 24))
+  const deadlineDate = new Date(task.deadline)
+  const daysLeft = Math.ceil((deadlineDate.getTime() - Date.now()) / (1000 * 60 * 60 * 24))
   const deadlineColor = daysLeft <= 3 ? 'text-red-400' : daysLeft <= 7 ? 'text-yellow-400' : 'text-gray-400'
 
   return (
@@ -251,33 +181,36 @@ function TaskCard({ task }: { task: Task }) {
               <StatusBadge status={task.status} />
             </div>
             <h3 className="text-base font-semibold text-white group-hover:text-[#14F195] transition-colors leading-snug">
-              {task.title}
+              {task.title || 'Untitled Task'}
             </h3>
           </div>
           {/* Reward */}
           <div className="ml-4 text-right shrink-0">
             <p className="text-lg font-bold text-[#14F195]">{task.reward} SOL</p>
             <p className={`text-xs ${deadlineColor}`}>
-              {daysLeft > 0 ? `${daysLeft}d left` : 'Expired'}
+              {daysLeft > 0 ? `${daysLeft}d left` : daysLeft === 0 ? 'Today' : 'Expired'}
             </p>
           </div>
         </div>
 
         {/* Description */}
         <p className="text-gray-400 text-sm leading-relaxed mb-4 line-clamp-2">
-          {task.description}
+          {task.description || 'No description provided'}
         </p>
 
         {/* Skills */}
         <div className="flex flex-wrap gap-1.5 mb-4">
-          {task.skills.map((s) => <SkillTag key={s} label={s} />)}
+          {(task.skills ?? []).map((s, i) => <SkillTag key={i} label={s} />)}
+          {(task.skills ?? []).length === 0 && (
+            <span className="text-xs text-gray-600 italic">No skills specified</span>
+          )}
         </div>
 
         {/* Footer */}
         <div className="flex items-center justify-between pt-3 border-t border-gray-800/50">
           <div className="flex items-center gap-3 text-xs text-gray-500">
             <span className="flex items-center gap-1">
-              <span>👥</span> {task.bids} bids
+              <span>👥</span> {task.bids ?? 0} bids
             </span>
             <span className="hidden sm:inline">•</span>
             <span className="hidden sm:inline flex items-center gap-1">
@@ -300,29 +233,56 @@ export default function TaskSquarePage() {
   const [budgetFilter, setBudgetFilter] = useState<BudgetRange>('all')
   const [sortBy, setSortBy] = useState<SortBy>('newest')
   const [searchQuery, setSearchQuery] = useState('')
+  const [tasks, setTasks] = useState<Task[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
-  const filtered = mockTasks
+  useEffect(() => {
+    let cancelled = false
+    setLoading(true)
+    setError(null)
+
+    fetchAllTasksWithPdas()
+      .then((converted) => {
+        if (cancelled || !converted) return
+        setTasks(converted)
+        setLoading(false)
+      })
+      .catch((err) => {
+        if (cancelled) return
+        console.error('[TaskSquare] fetchAllTasks error:', err)
+        setError('Failed to load tasks from chain. Showing demo data.')
+        setLoading(false)
+      })
+
+    return () => { cancelled = true }
+  }, [])
+
+  const filtered = tasks
     .filter((t) => {
       if (typeFilter !== 'all' && t.status !== typeFilter) return false
       if (budgetFilter !== 'all') {
-        const [min, max] = budgetFilter.split('-').map(Number)
+        const parts = budgetFilter.split('-').map(Number)
         if (budgetFilter === '10+') { if (t.reward < 10) return false }
-        else { if (t.reward < min || t.reward > max) return false }
+        else { if (t.reward < parts[0] || t.reward > parts[1]) return false }
       }
       if (searchQuery) {
         const q = searchQuery.toLowerCase()
-        if (!t.title.toLowerCase().includes(q) && !t.description.toLowerCase().includes(q) && !t.skills.some(s => s.toLowerCase().includes(q))) return false
+        const matchTitle = (t.title ?? '').toLowerCase().includes(q)
+        const matchDesc  = (t.description ?? '').toLowerCase().includes(q)
+        const matchSkill = (t.skills ?? []).some(s => s.toLowerCase().includes(q))
+        if (!matchTitle && !matchDesc && !matchSkill) return false
       }
       return true
     })
     .sort((a, b) => {
       if (sortBy === 'deadline') return new Date(a.deadline).getTime() - new Date(b.deadline).getTime()
-      if (sortBy === 'reward') return b.reward - a.reward
-      if (sortBy === 'bids') return b.bids - a.bids
-      return 0 // newest = default order
+      if (sortBy === 'reward')    return b.reward - a.reward
+      if (sortBy === 'bids')      return (b.bids ?? 0) - (a.bids ?? 0)
+      return 0
     })
 
-  const openCount = mockTasks.filter(t => t.status === 'open').length
+  const openCount = tasks.filter(t => t.status === 'open').length
 
   return (
     <div className="space-y-6 max-w-5xl">
@@ -332,7 +292,12 @@ export default function TaskSquarePage() {
         <div>
           <h1 className="text-2xl font-bold text-white">Task Square</h1>
           <p className="text-gray-500 text-sm mt-0.5">
-            {openCount} open tasks · Powered by Solana
+            {loading
+              ? 'Loading from chain...'
+              : error
+                ? `${openCount} open · using demo data`
+                : `${openCount} open tasks · ${tasks.length} total · Solana Devnet`
+            }
           </p>
         </div>
         <Link
@@ -349,12 +314,8 @@ export default function TaskSquarePage() {
 
       {/* ── Filters Row ── */}
       <div className="bg-[#111827] border border-gray-800/70 rounded-2xl p-4 space-y-4">
-        {/* Search */}
         <SearchInput value={searchQuery} onChange={setSearchQuery} />
-
-        {/* Filter Pills + Dropdowns */}
         <div className="flex flex-wrap items-center gap-3">
-          {/* Type filter */}
           <div className="flex items-center gap-2">
             <span className="text-xs text-gray-500 font-medium">Type:</span>
             <div className="flex gap-2">
@@ -365,32 +326,44 @@ export default function TaskSquarePage() {
               ))}
             </div>
           </div>
-
           <span className="hidden sm:inline text-gray-700">|</span>
-
-          {/* Budget */}
           <div className="flex items-center gap-2">
             <span className="text-xs text-gray-500 font-medium">Budget:</span>
             <BudgetFilter value={budgetFilter} onChange={setBudgetFilter} />
           </div>
-
           <span className="hidden sm:inline text-gray-700">|</span>
-
-          {/* Sort */}
           <div className="flex items-center gap-2">
             <span className="text-xs text-gray-500 font-medium">Sort:</span>
             <SortFilter value={sortBy} onChange={setSortBy} />
           </div>
-
-          {/* Result count */}
           <span className="ml-auto text-xs text-gray-500">
-            {filtered.length} result{filtered.length !== 1 ? 's' : ''}
+            {loading ? '...' : `${filtered.length} result${filtered.length !== 1 ? 's' : ''}`}
           </span>
         </div>
       </div>
 
       {/* ── Task List ── */}
-      {filtered.length === 0 ? (
+      {loading ? (
+        <div className="space-y-4">
+          {[1, 2, 3].map(i => (
+            <div key={i} className="bg-[#111827] border border-gray-800/70 rounded-2xl p-5 animate-pulse">
+              <div className="flex items-start justify-between mb-3">
+                <div className="space-y-2 flex-1">
+                  <div className="h-3 bg-gray-700 rounded w-20" />
+                  <div className="h-4 bg-gray-700 rounded w-3/4" />
+                </div>
+                <div className="h-6 bg-gray-700 rounded w-16" />
+              </div>
+              <div className="h-3 bg-gray-700 rounded w-full mb-2" />
+              <div className="h-3 bg-gray-700 rounded w-2/3" />
+            </div>
+          ))}
+        </div>
+      ) : error ? (
+        <div className="bg-amber-500/10 border border-amber-500/25 rounded-xl p-4 text-sm text-amber-400 text-center">
+          ⚠️ {error}
+        </div>
+      ) : filtered.length === 0 ? (
         <div className="text-center py-16 bg-[#111827] border border-gray-800/70 rounded-2xl">
           <span className="text-4xl mb-4 block">🔍</span>
           <p className="text-gray-400 font-medium">No tasks found</p>
@@ -405,4 +378,13 @@ export default function TaskSquarePage() {
       )}
     </div>
   )
+}
+
+// ─── Internal: fetch tasks WITH their PDAs ───────────────────────────────
+async function fetchAllTasksWithPdas(): Promise<Task[]> {
+  const { getProgram } = await import('../api/anchorClient')
+  const program = getProgram()
+  const acc = program.account as Record<string, { all: () => Promise<Array<{ publicKey: any; account: any }>> }>
+  const raw = await acc.task.all()
+  return raw.map(({ publicKey, account }) => chainTaskToTask(publicKey.toBase58(), account))
 }

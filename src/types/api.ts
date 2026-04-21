@@ -30,7 +30,7 @@ export enum BackendTaskStatus {
 }
 
 /** 前端 TaskStatus 枚举（与 mock 数据对齐） */
-export type FrontendTaskStatus = 'open' | 'in_progress' | 'completed' | 'cancelled'
+export type FrontendTaskStatus = 'open' | 'assigned' | 'in_progress' | 'submitted' | 'completed' | 'cancelled' | 'disputed'
 
 /** 后端原始 Task 实体（snake_case） */
 export interface RawTask {
@@ -231,6 +231,64 @@ export interface Transaction {
   tx_signature: string
   timestamp: string
   memo?: string
+}
+
+// ---------- Chain-onchain Types ----------
+
+/** Raw Task account as returned by Anchor */
+export interface ChainTask {
+  creator: string
+  worker: string
+  escrow: string
+  title: string
+  description: string
+  reward: string
+  status: number
+  deadline: string
+  verificationDeadline: string
+  submissionTime?: string
+  verificationTime?: string
+  skillsRequired: string
+  category: string
+  submissionUri: string
+  bump: number
+}
+
+/** Status enum mapping (matches contract) */
+export const CHAIN_TASK_STATUS: Record<number, FrontendTaskStatus> = {
+  0: 'open',
+  1: 'in_progress',
+  2: 'submitted',
+  3: 'completed',
+  4: 'cancelled',
+  5: 'disputed',
+}
+
+/** Convert raw chain Task → frontend Task */
+export function chainTaskToTask(pda: string, t: ChainTask): Task {
+  const rewardU64 = typeof t.reward === 'string' ? t.reward : String(t.reward ?? 0)
+  const rewardNum = Number(BigInt(rewardU64) / BigInt(1e9)) // lamports → SOL
+  const status: FrontendTaskStatus = CHAIN_TASK_STATUS[t.status] ?? 'open'
+  return {
+    id: pda,
+    title: t.title,
+    description: t.description,
+    reward: rewardNum,
+    status,
+    deadline: new Date(Number(t.deadline) * 1000).toISOString().slice(0, 10),
+    verification_deadline: t.verificationDeadline
+      ? new Date(Number(t.verificationDeadline) * 1000).toISOString().slice(0, 10)
+      : undefined,
+    category: t.category || 'General',
+    skills: t.skillsRequired ? t.skillsRequired.split(',').map(s => s.trim()) : [],
+    createdAt: new Date().toISOString().slice(0, 10),
+    bids: 0,
+    bidRange: { min: rewardNum * 0.8, max: rewardNum * 1.2 },
+    publisher: t.creator ? { address: t.creator, reputation: 0, tasksCompleted: 0, tasksFailed: 0, joinedDays: 0 } : null,
+    worker: t.worker && t.worker !== '11111111111111111111111111111111'
+      ? { address: t.worker, reputation: 0, tasksCompleted: 0, tasksFailed: 0, joinedDays: 0 }
+      : undefined,
+  }
 }
 
 // ---------- Error Types ----------

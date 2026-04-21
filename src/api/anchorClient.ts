@@ -110,14 +110,30 @@ export function findAgentProfilePda(owner: PublicKey): PublicKey {
   return pda
 }
 
-/** Task PDA: seeds = [task, creator] */
-export function findTaskPda(creator: PublicKey): PublicKey {
-  const [pda, bump] = PublicKey.findProgramAddressSync(
-    [Buffer.from('task'), creator.toBuffer()],
+/** Task PDA: seeds = [task, creator, title_hash[0..8]] */
+import { sha256 } from '@noble/hashes/sha2.js'
+
+function hashTitle(title: string): Buffer {
+  const hash = sha256(new TextEncoder().encode(title))
+  return Buffer.from(hash).slice(0, 8)
+}
+
+export function findTaskPda(creator: PublicKey, title: string): PublicKey {
+  const titleHash = hashTitle(title)
+  const [pda] = PublicKey.findProgramAddressSync(
+    [Buffer.from('task'), creator.toBuffer(), titleHash],
     PROGRAM_ID,
   )
-  if (bump === undefined) throw new Error('Task PDA derivation failed')
   return pda
+}
+
+export function getTaskBump(creator: PublicKey, title: string): number {
+  const titleHash = hashTitle(title)
+  const [, bump] = PublicKey.findProgramAddressSync(
+    [Buffer.from('task'), creator.toBuffer(), titleHash],
+    PROGRAM_ID,
+  )
+  return bump
 }
 
 /** Task escrow PDA: seeds = [escrow, task] */
@@ -152,33 +168,41 @@ export async function initializePlatform(wallet: {
   if (!wallet?.publicKey) throw new Error('WALLET_NOT_CONNECTED')
   const program = getProgram(wallet)
   try {
-    return await program.methods.initializePlatform().rpc()
+    // IDL instruction name is "initialize", not "initializePlatform"
+    return await program.methods.initialize().rpc()
   } catch (err) {
     const { userMsg, code } = classifyChainError(err)
-    console.error(`[anchorClient] initializePlatform error [${code}]:`, err)
+    console.error(`[anchorClient] initialize error [${code}]:`, err)
     throw new Error(userMsg)
   }
 }
 
 /**
- * initialize_worker_profile — create an agent profile for the signing wallet.
+ * registerAgent — create an agent profile for the signing wallet.
+ * IDL instruction name: "registerAgent"
  */
-export async function initializeWorkerProfile(wallet: {
-  signTransaction: <T extends Transaction>(tx: T) => Promise<T>
-  publicKey: PublicKey
-}): Promise<string> {
+export async function registerAgent(
+  wallet: {
+    signTransaction: <T extends Transaction>(tx: T) => Promise<T>
+    publicKey: PublicKey
+  },
+  name: string,
+  agentType: string,
+  skills: string,
+  hourlyRate: number,
+): Promise<string> {
   if (!wallet?.publicKey) throw new Error('WALLET_NOT_CONNECTED')
   const program = getProgram(wallet)
-  const workerProfile = findAgentProfilePda(wallet.publicKey)
+  const agentProfile = findAgentProfilePda(wallet.publicKey)
   try {
-    return await program.methods.initializeWorkerProfile().accounts({
-      owner: wallet.publicKey,
-      workerProfile,
+    return await program.methods.registerAgent(name, agentType, skills, hourlyRate).accounts({
+      authority: wallet.publicKey,
+      agentProfile,
       systemProgram: PublicKey.default,
     } as never).rpc()
   } catch (err) {
     const { userMsg, code } = classifyChainError(err)
-    console.error(`[anchorClient] initializeWorkerProfile error [${code}]:`, err)
+    console.error(`[anchorClient] registerAgent error [${code}]:`, err)
     throw new Error(userMsg)
   }
 }
@@ -207,7 +231,7 @@ export async function createTask(
   if (!wallet?.publicKey) throw new Error('WALLET_NOT_CONNECTED')
   if (!reward || reward <= 0) throw new Error('INVALID_AMOUNT')
   const program = getProgram(wallet)
-  const task = findTaskPda(wallet.publicKey)
+  const task = findTaskPda(wallet.publicKey, title)
   const escrow = findEscrowPda(task)
   try {
     return await program.methods
@@ -578,6 +602,21 @@ export async function fetchTreasury(treasury: PublicKey) {
   const program = getProgram()
   const acc = program.account as Record<string, { fetch: (pk: PublicKey) => Promise<unknown> }>
   return acc.platformTreasury.fetch(treasury)
+}
+
+/** Fetch ALL Task accounts from the program (devnet scan) */
+export async function fetchAllTasks(): Promise<unknown[]> {
+  const program = getProgram()
+  const acc = program.account as Record<string, { fetch: (pk: PublicKey) => Promise<unknown> }>
+  const accounts = await connection.getProgramAccounts(PROGRAM_ID, {
+    filters: [{ dataSize: 800 }],
+  })
+  const results = await Promise.allSettled(
+    accounts.map(({ pubkey }) => acc.task.fetch(pubkey))
+  )
+  return results
+    .filter((r): r is PromiseFulfilledResult<unknown> => r.status === 'fulfilled')
+    .map(r => r.value)
 }
 
 // ─── Event Listeners ─────────────────────────────────────────────────────────

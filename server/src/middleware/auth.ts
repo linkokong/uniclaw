@@ -3,6 +3,7 @@ import { jwtVerify, SignJWT } from 'jose'
 import { redis, pool } from '../models/index.js'
 import { config } from '../config/index.js'
 import { SessionData } from '../types/index.js'
+import { PublicKey } from '@solana/web3.js'
 
 const JWT_SECRET = new TextEncoder().encode(config.jwt.secret)
 
@@ -42,7 +43,7 @@ export async function authenticateJWT(req: AuthRequest, res: Response, next: Nex
     }
 
     const token = authHeader.substring(7)
-    
+
     try {
       const { payload } = await jwtVerify(token, JWT_SECRET)
       req.user = {
@@ -76,7 +77,6 @@ export async function authenticateSession(req: AuthRequest, res: Response, next:
     }
 
     if (sessionId) {
-      // Check Redis for session
       const sessionData = await redis.get(`session:${sessionId}`)
       if (!sessionData) {
         res.status(401).json({
@@ -100,58 +100,71 @@ export async function authenticateSession(req: AuthRequest, res: Response, next:
   }
 }
 
-// Solana wallet signature verification (EIP-4361 style)
-// FIX: removed broken TextEncoder().encode() interpolation
-import { PublicKey } from '@solana/web3.js'
-import { verify } from '@noble/ed25519'
+// --- Solana EIP-4361 wallet signature verification ---
 
 export async function verifySiweMessage(
   message: { address: string; nonce: string; signMessage?: string },
   signature: string
 ): Promise<boolean> {
   try {
-    // Verify nonce exists and is not expired
+    // 1. Verify nonce exists and is not expired
     const nonceData = await pool.query(
       'SELECT expires_at FROM auth_nonces WHERE wallet_address = $1 AND nonce = $2',
       [message.address, message.nonce]
     )
 
-    if (nonceData.rows.length === 0) return false
+    if (nonceData.rows.length === 0) {
+      console.error('[verify] Nonce not found in DB:', message.nonce, 'for', message.address)
+      return false
+    }
     const expiresAt = new Date(nonceData.rows[0].expires_at)
-    if (expiresAt < new Date()) return false
+    if (expiresAt < new Date()) {
+      console.error('[verify] Nonce expired')
+      return false
+    }
 
-    // Decode signature (base64 or hex)
+    // 2. Decode signature (base64 from Phantom, hex as fallback)
     let signatureBytes: Uint8Array
     try {
-      signatureBytes = Uint8Array.from(atob(signature), c => c.charCodeAt(0))
+      signatureBytes = Uint8Array.from(Buffer.from(signature, 'base64'))
+      if (signatureBytes.length !== 64) throw new Error('base64 sig not 64 bytes')
     } catch {
-      signatureBytes = Uint8Array.from(Buffer.from(signature, 'hex'))
+      try {
+        signatureBytes = Uint8Array.from(Buffer.from(signature, 'hex'))
+        if (signatureBytes.length !== 64) throw new Error('hex sig not 64 bytes')
+      } catch {
+        console.error('[verify] Failed to decode signature (not base64 or hex):', signature.substring(0, 20))
+        return false
+      }
     }
 
-    // Use signMessage if provided (from frontend), otherwise reconstruct from nonce
-    let signMessage: string
-    if (message.signMessage) {
-      signMessage = message.signMessage
-    } else {
-      // Fallback: reconstruct generic sign message (frontend uses window.location.host)
-      signMessage = `localhost wants you to sign in with your Solana account.\n\nSign this message to authenticate with Claw Universe.\n\nNonce: ${message.nonce}`
-    }
-    const messageBytes = new TextEncoder().encode(signMessage)
-    const publicKeyBytes = new PublicKey(message.address).toBytes()
+    // 3. Use signMessage from body (JSON, preserves newlines)
+    // Note: message.signMessage is the exact string Phantom signed over
+    const reconstructedMessage = message.signMessage
+    const messageBytes = new TextEncoder().encode(reconstructedMessage)
+    const publicKeyBytes = new Uint8Array(new PublicKey(message.address).toBytes())
 
-    // Real Ed25519 signature verification
-    const isValid = await verify(signatureBytes, messageBytes, publicKeyBytes)
+    console.log('[verify] sig len:', signatureBytes.length, '| msg len:', messageBytes.length, '| pk len:', publicKeyBytes.length)
+    console.log('[verify] signMessage bytes:', Buffer.from(messageBytes).toString('hex').substring(0, 80))
+    console.log('[verify] signMessage (str):', JSON.stringify(reconstructedMessage))
+    console.log('[verify] pk hex:', Buffer.from(publicKeyBytes).toString('hex'))
 
-    // Delete nonce after successful verification
-    if (isValid) {
-      await pool.query(
-        'DELETE FROM auth_nonces WHERE wallet_address = $1 AND nonce = $2',
-        [message.address, message.nonce]
-      )
-    }
+    // 4. Ed25519 verify using @noble/ed25519 with dynamic ESM import
+    // This ensures proper WASM initialization in the ESM context used by tsx
+    const { verifyAsync } = await import('@noble/ed25519')
+    const isValid = await verifyAsync(signatureBytes, messageBytes, publicKeyBytes)
+
+    console.log('[verify] noble result:', isValid)
+
+    // 5. Delete nonce after verification attempt
+    await pool.query(
+      'DELETE FROM auth_nonces WHERE wallet_address = $1 AND nonce = $2',
+      [message.address, message.nonce]
+    )
+
     return isValid
   } catch (error) {
-    console.error('Signature verification error:', error)
+    console.error('[verify] Unexpected error:', error)
     return false
   }
 }
@@ -159,7 +172,7 @@ export async function verifySiweMessage(
 // Optional authentication (doesn't fail if no token)
 export function optionalAuth(req: AuthRequest, res: Response, next: NextFunction): void {
   const authHeader = req.headers.authorization
-  
+
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
     next()
     return

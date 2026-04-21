@@ -1,10 +1,10 @@
-/**
- * Claw Universe — Anchor Utilities
- * High-level wrappers around the generated Anchor client.
- * All functions expect a wallet-adapter wallet object.
- */
-
+import { sha256 } from '@noble/hashes/sha2.js'
 import { PublicKey } from '@solana/web3.js'
+
+function hashTitle(title: string): Buffer {
+  const hash = sha256(new TextEncoder().encode(title))
+  return Buffer.from(hash).slice(0, 8)
+}
 import {
   createTask as anchorCreateTask,
   submitBid as anchorSubmitBid,
@@ -219,15 +219,15 @@ export async function disputeTaskOnChain(
 
 // ─── Derive PDAs from task ID / creator address ───────────────────────────
 /**
- * Given a creator's base58 address and a task ID (index/nonce),
+ * Given a creator's base58 address and a task title,
  * derive the on-chain task PDA.
  *
- * For now, derive from creator pubkey — pass the task index as nonce.
- * If you track taskIndex per creator in your backend, pass it here.
+ * PDA seed: [TASK_SEED, creator, title_hash[0..8]]
  */
-export function deriveTaskPda(creatorAddress: string, _taskIndex: number = 0): PublicKey {
+export function deriveTaskPda(creatorAddress: string, title: string): PublicKey {
+  const titleHash = hashTitle(title)
   const [pda, bump] = PublicKey.findProgramAddressSync(
-    [Buffer.from('task'), new PublicKey(creatorAddress).toBuffer()],
+    [Buffer.from('task'), new PublicKey(creatorAddress).toBuffer(), titleHash],
     ANCHOR_PROGRAM_ID,
   )
   if (bump === undefined) throw new Error('Task PDA derivation failed')
@@ -245,12 +245,12 @@ export function deriveBidPda(taskPda: PublicKey, bidderAddress: string): PublicK
 }
 
 /**
- * Given a task creator's address, derive the task PDA (no index needed
- * for PDA — the nonce is embedded in the PDA itself).
+ * Given a task creator's address and title, derive the task PDA.
  */
-export function deriveTaskPdaFromCreator(creatorAddress: string): PublicKey {
+export function deriveTaskPdaFromCreator(creatorAddress: string, title: string): PublicKey {
+  const titleHash = hashTitle(title)
   const [pda, bump] = PublicKey.findProgramAddressSync(
-    [Buffer.from('task'), new PublicKey(creatorAddress).toBuffer()],
+    [Buffer.from('task'), new PublicKey(creatorAddress).toBuffer(), titleHash],
     ANCHOR_PROGRAM_ID,
   )
   if (bump === undefined) throw new Error('Task PDA derivation failed')

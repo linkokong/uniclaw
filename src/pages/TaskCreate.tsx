@@ -470,7 +470,7 @@ export function TaskCreatePage() {
       })
 
       // Navigate to the newly created task detail page
-      navigate(`/task/${task.id}`)
+      navigate(`/tasks/${task.id}`)
     } catch (err) {
       setServerError(err instanceof Error ? err.message : 'Failed to create task. Please try again.')
       setSubmitting(false)

@@ -1,45 +1,14 @@
 import { Response } from 'express'
 import { asyncHandler } from '../middleware/error.js'
+import { userService } from '../services/user.js'
+import { solanaService } from '../services/solana.js'
+import { config } from '../config/index.js'
 import type { AuthRequest } from '../middleware/auth.js'
 
-// 模拟用户服务
-const mockUserService = {
-  getByWallet: async (wallet: string) => ({
-    id: 1,
-    did: `did:claw:sol:${wallet}:agent1`,
-    wallet_address: wallet,
-    agent_id: 'agent1',
-    nickname: 'Test User',
-    reputation: 100,
-    tier: 'gold',
-    status: 'active'
-  }),
-  getById: async (id: string) => ({
-    id: parseInt(id),
-    did: `did:claw:sol:user${id}:agent1`,
-    wallet_address: 'MockWalletAddress' + id,
-    agent_id: 'agent1',
-    nickname: 'Test User ' + id,
-    reputation: 100,
-    tier: 'gold',
-    status: 'active'
-  }),
-  updateProfile: async (wallet: string, data: any) => ({ wallet_address: wallet, ...data }),
-  updateById: async (id: string, data: any) => ({ id: parseInt(id), ...data, updated_at: new Date() }),
-  getLeaderboard: async (limit: number, tier?: string) => [],
-  generateNonce: async (wallet: string) => Math.random().toString(36).substring(2)
-}
-
-// 模拟Solana服务
-const mockSolanaService = {
-  getBalance: async (wallet: string) => '10.5',
-  getTransactionHistory: async (wallet: string, limit: number) => []
-}
-
 export const userController = {
-  // GET /users/me - 获取当前用户
+  // GET /users/me - 获取当前用户（从 DB 读）
   getMe: asyncHandler(async (req: AuthRequest, res: Response) => {
-    const user = await mockUserService.getByWallet(req.user!.walletAddress)
+    const user = await userService.getByWallet(req.user!.walletAddress)
     if (!user) {
       return res.status(404).json({
         success: false,
@@ -51,8 +20,7 @@ export const userController = {
 
   // GET /users/:wallet - 根据钱包获取用户
   getByWallet: asyncHandler(async (req: AuthRequest, res: Response) => {
-    const wallet = req.params.wallet as string
-    const user = await mockUserService.getByWallet(wallet)
+    const user = await userService.getByWallet(String(req.params.wallet))
     if (!user) {
       return res.status(404).json({
         success: false,
@@ -62,65 +30,82 @@ export const userController = {
     res.json({ success: true, data: user })
   }),
 
-  // GET /users/id/:id - 根据用户ID获取用户
+  // GET /users/id/:id - 根据 ID 获取用户
   getById: asyncHandler(async (req: AuthRequest, res: Response) => {
-    const id = req.params.id as string
-    const user = await mockUserService.getById(id)
+    const user = await userService.getById(String(req.params.id))
     if (!user) {
       return res.status(404).json({
         success: false,
         error: { code: 'NOT_FOUND', message: 'User not found' }
       })
     }
-    res.json({ success: true, data: user })
-  }),
-
-  // PATCH /users/me - 更新当前用户资料
-  updateProfile: asyncHandler(async (req: AuthRequest, res: Response) => {
-    const user = await mockUserService.updateProfile(req.user!.walletAddress, req.body)
     res.json({ success: true, data: user })
   }),
 
   // PUT /users/:id - 更新指定用户资料
   updateById: asyncHandler(async (req: AuthRequest, res: Response) => {
-    const id = req.params.id as string
-    const user = await mockUserService.updateById(id, req.body)
+    // Only allow users to update their own profile (by wallet match)
+    const targetUser = await userService.getById(String(req.params.id))
+    if (!targetUser) {
+      return res.status(404).json({
+        success: false,
+        error: { code: 'NOT_FOUND', message: 'User not found' }
+      })
+    }
+    if (targetUser.wallet_address !== req.user!.walletAddress) {
+      return res.status(403).json({
+        success: false,
+        error: { code: 'FORBIDDEN', message: 'Cannot update another user\'s profile' }
+      })
+    }
+    const user = await userService.updateProfile(targetUser.wallet_address, req.body)
+    res.json({ success: true, data: user })
+  }),
+
+  // PATCH /users/me - 更新当前用户资料
+  updateProfile: asyncHandler(async (req: AuthRequest, res: Response) => {
+    const user = await userService.updateProfile(req.user!.walletAddress, req.body)
     res.json({ success: true, data: user })
   }),
 
   // GET /users/leaderboard - 排行榜
   getLeaderboard: asyncHandler(async (req: AuthRequest, res: Response) => {
     const limit = Math.min((req.query.limit as unknown as number) || 20, 100)
-    const tier = req.query.tier as string | undefined
-    const users = await mockUserService.getLeaderboard(limit, tier)
+    const users = await userService.getLeaderboard(limit)
     res.json({ success: true, data: users })
   }),
 
-  // GET /users/nonce - 获取nonce
-  getNonce: asyncHandler(async (_req: AuthRequest, res: Response) => {
-    const wallet = _req.query.wallet as string
+  // GET /users/nonce - 获取 nonce（用于钱包签名登录）
+  getNonce: asyncHandler(async (req: any, res: Response) => {
+    const wallet = req.query.wallet as string
     if (!wallet) {
       return res.status(400).json({
         success: false,
         error: { code: 'VALIDATION_ERROR', message: 'Wallet address required' }
       })
     }
-    const nonce = await mockUserService.generateNonce(wallet)
+    const nonce = await userService.generateNonce(wallet)
     res.json({ success: true, data: { nonce } })
   }),
 
-  // GET /users/:wallet/balance - 获取余额
-  getBalance: asyncHandler(async (req: AuthRequest, res: Response) => {
+  // GET /users/:wallet/balance - 获取用户 SOL + UNIC 余额
+  getBalance: asyncHandler(async (req: any, res: Response) => {
     const wallet = req.params.wallet as string
-    const balance = await mockSolanaService.getBalance(wallet)
-    res.json({ success: true, data: { balance } })
+    const [solBalance, unicBalance] = await Promise.all([
+      solanaService.getBalance(wallet),
+      solanaService.getUnicBalance(wallet, config.solana.tokenMint),
+    ])
+    res.json({
+      success: true,
+      data: { sol: solBalance, unic: unicBalance, wallet },
+    })
   }),
 
   // GET /users/:wallet/transactions - 获取交易历史
-  getTransactions: asyncHandler(async (req: AuthRequest, res: Response) => {
+  getTransactions: asyncHandler(async (req: any, res: Response) => {
     const wallet = req.params.wallet as string
     const limit = Math.min((req.query.limit as unknown as number) || 20, 100)
-    const transactions = await mockSolanaService.getTransactionHistory(wallet, limit)
+    const transactions = await solanaService.getTransactionHistory(wallet, limit)
     res.json({ success: true, data: transactions })
-  })
+  }),
 }

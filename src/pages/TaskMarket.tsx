@@ -209,6 +209,16 @@ export default function TaskMarket() {
             <span className="text-base leading-none">⚡</span>
             On-chain
           </button>
+          <button
+            onClick={() => fetchTasks(page)}
+            className="flex items-center gap-2 px-4 py-2.5
+              bg-[#1f2937] border border-gray-600
+              rounded-xl text-sm font-medium text-gray-300
+              hover:border-[#9945FF]/50 hover:text-white transition-all"
+            title="Refresh"
+          >
+            ↻
+          </button>
           <Link
             to="/create-task"
             className="flex items-center gap-2 px-5 py-2.5

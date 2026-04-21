@@ -1,15 +1,24 @@
 /**
  * WalletConnect Component
- * 
- * Beautiful wallet connection UI for Claw Universe
- * Supports Phantom and Solflare wallets
+ *
+ * Wallet connection UI for Uniclaw
  * Displays address, balance, and disconnect button
  */
-import { useMemo } from 'react'
+import { useEffect, useMemo, useState } from 'react'
+import { useWallet } from '@solana/wallet-adapter-react'
 import { useWalletState } from '../hooks/useWallet'
+import { registerWallet } from '../api/client'
 import { colors, radius, shadows, transitions } from '../design-system'
 
+// ─── 检测 Phantom 是否安装 ─────────────────────────────────────────────────
+function isPhantomInstalled() {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const w = window as any
+  return !!(w.phantom?.solana?.isPhantom || w.solana?.isPhantom)
+}
+
 export default function WalletConnect() {
+  const { signMessage, publicKey } = useWallet()
   const {
     connected,
     connecting,
@@ -23,7 +32,20 @@ export default function WalletConnect() {
     refreshBalance,
   } = useWalletState()
 
-  // Get wallet icon color based on wallet name
+  const [phantomDetected, setPhantomDetected] = useState(false)
+
+  // ⚠️ 所有 hooks 必须在条件 return 之前调用（React Hooks 规则）
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setPhantomDetected(isPhantomInstalled())
+    }, 500)
+    return () => clearTimeout(timer)
+  }, [])
+
+  useEffect(() => {
+    registerWallet(signMessage ?? null, publicKey)
+  }, [signMessage, publicKey, connected])
+
   const walletIconColor = useMemo(() => {
     if (!walletName) return colors.solana.purple
     if (walletName.toLowerCase().includes('phantom')) return '#AB9FF2'
@@ -31,12 +53,39 @@ export default function WalletConnect() {
     return colors.solana.purple
   }, [walletName])
 
-  // Loading state
+  // ─── 条件渲染放在所有 hooks 之后 ──────────────────────────────────────
+
+  if (!phantomDetected) {
+    return (
+      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+        <button
+          onClick={() => window.open('https://chrome.google.com/webstore/detail/phantom/bfnaelmomeimhlpmgjnjophhpkkoljpa', '_blank')}
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            padding: '10px 16px',
+            background: 'linear-gradient(135deg, #9945FF, #14F195)',
+            border: 'none',
+            borderRadius: radius.lg,
+            color: '#fff',
+            fontSize: '14px',
+            fontWeight: 600,
+            cursor: 'pointer',
+            boxShadow: '0 0 20px rgba(153, 69, 255, 0.4)',
+          }}
+        >
+          <span style={{ fontSize: '16px' }}>👻</span>
+          <span>安装 Phantom 钱包</span>
+        </button>
+      </div>
+    )
+  }
+
   if (connecting || disconnecting) {
     return (
       <button
         disabled
-        className="wallet-connect-btn loading"
         style={{
           display: 'flex',
           alignItems: 'center',
@@ -58,20 +107,10 @@ export default function WalletConnect() {
     )
   }
 
-  // Connected state
   if (connected && shortAddress) {
     return (
-      <div
-        className="wallet-connect-connected"
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: '12px',
-        }}
-      >
-        {/* Wallet info */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
         <div
-          className="wallet-info"
           style={{
             display: 'flex',
             alignItems: 'center',
@@ -86,7 +125,6 @@ export default function WalletConnect() {
           onClick={refreshBalance}
           title="Click to refresh balance"
         >
-          {/* Wallet icon */}
           <div
             style={{
               width: '24px',
@@ -103,8 +141,7 @@ export default function WalletConnect() {
           >
             {walletName?.charAt(0) || 'W'}
           </div>
-          
-          {/* Address */}
+
           <span
             style={{
               fontFamily: 'JetBrains Mono, monospace',
@@ -115,25 +152,10 @@ export default function WalletConnect() {
           >
             {shortAddress}
           </span>
-          
-          {/* Separator */}
-          <div
-            style={{
-              width: '1px',
-              height: '16px',
-              background: colors.border.default,
-            }}
-          />
-          
-          {/* Balance */}
-          <span
-            style={{
-              fontSize: '13px',
-              color: colors.text.accent,
-              fontWeight: 500,
-              minWidth: '60px',
-            }}
-          >
+
+          <div style={{ width: '1px', height: '16px', background: colors.border.default }} />
+
+          <span style={{ fontSize: '13px', color: colors.text.accent, fontWeight: 500, minWidth: '60px' }}>
             {loading ? (
               <MiniSpinner />
             ) : balance !== null ? (
@@ -144,7 +166,6 @@ export default function WalletConnect() {
           </span>
         </div>
 
-        {/* Disconnect button */}
         <button
           onClick={disconnect}
           style={{
@@ -177,11 +198,9 @@ export default function WalletConnect() {
     )
   }
 
-  // Disconnected state - Connect button
   return (
     <button
       onClick={connect}
-      className="wallet-connect-btn connect"
       style={{
         display: 'flex',
         alignItems: 'center',
@@ -216,16 +235,7 @@ export default function WalletConnect() {
 
 function WalletIcon() {
   return (
-    <svg
-      width="18"
-      height="18"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
       <path d="M21 12V7H5a2 2 0 0 1 0-4h14v4" />
       <path d="M3 5v14a2 2 0 0 0 2 2h16v-5" />
       <path d="M18 12a2 2 0 0 0 0 4h4v-4h-4z" />
@@ -235,16 +245,7 @@ function WalletIcon() {
 
 function DisconnectIcon() {
   return (
-    <svg
-      width="18"
-      height="18"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
       <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
       <polyline points="16,17 21,12 16,7" />
       <line x1="21" y1="12" x2="9" y2="12" />
@@ -254,16 +255,7 @@ function DisconnectIcon() {
 
 function Spinner() {
   return (
-    <svg
-      width="16"
-      height="16"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      className="animate-spin"
-      style={{ animation: 'spin 1s linear infinite' }}
-    >
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="animate-spin" style={{ animation: 'spin 1s linear infinite' }}>
       <path d="M21 12a9 9 0 1 1-6.219-8.56" />
     </svg>
   )
@@ -271,15 +263,7 @@ function Spinner() {
 
 function MiniSpinner() {
   return (
-    <svg
-      width="14"
-      height="14"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      style={{ animation: 'spin 1s linear infinite', display: 'inline-block' }}
-    >
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ animation: 'spin 1s linear infinite', display: 'inline-block' }}>
       <path d="M21 12a9 9 0 1 1-6.219-8.56" />
     </svg>
   )

@@ -5,10 +5,13 @@ import type { Task } from '../types/api'
 // ─── Status Badge ─────────────────────────────────────────────────────────
 export function StatusBadge({ status }: { status: Task['status'] }) {
   const config = {
-    open:       { label: 'OPEN',         bg: 'bg-emerald-500/15', text: 'text-emerald-400', dot: 'bg-emerald-400' },
-    in_progress: { label: 'IN PROGRESS', bg: 'bg-yellow-500/15',  text: 'text-yellow-400',  dot: 'bg-yellow-400' },
-    completed:   { label: 'COMPLETED',   bg: 'bg-gray-500/15',    text: 'text-gray-400',     dot: 'bg-gray-400' },
-    cancelled:   { label: 'CANCELLED', bg: 'bg-red-500/15',   text: 'text-red-400',    dot: 'bg-red-400' },
+    open:       { label: 'OPEN',       bg: 'bg-emerald-500/15', text: 'text-emerald-400', dot: 'bg-emerald-400' },
+    assigned:   { label: 'ASSIGNED',   bg: 'bg-blue-500/15',    text: 'text-blue-400',    dot: 'bg-blue-400' },
+    in_progress:{ label: 'WORKING',   bg: 'bg-yellow-500/15',   text: 'text-yellow-400',  dot: 'bg-yellow-400' },
+    submitted:  { label: 'SUBMITTED',  bg: 'bg-orange-500/15',  text: 'text-orange-400',  dot: 'bg-orange-400' },
+    completed:  { label: 'COMPLETED', bg: 'bg-gray-500/15',    text: 'text-gray-400',     dot: 'bg-gray-400' },
+    cancelled:  { label: 'CANCELLED', bg: 'bg-red-500/15',     text: 'text-red-400',     dot: 'bg-red-400' },
+    disputed:   { label: 'DISPUTED',  bg: 'bg-orange-500/15',  text: 'text-orange-400',  dot: 'bg-orange-400' },
   }[status] ?? { label: 'UNKNOWN', bg: '', text: '', dot: '' }
 
   return (
