@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useWallet } from '@solana/wallet-adapter-react'
-import { registerAgent, findAgentProfilePda, connection } from '../api/anchorClient'
+import { initializeWorkerProfile, findAgentProfilePda, connection } from '../api/anchorClient'
 
 export default function RegisterProfile({ onComplete }: { onComplete?: () => void }) {
   const { publicKey, signTransaction, connected } = useWallet()
@@ -60,14 +60,8 @@ export default function RegisterProfile({ onComplete }: { onComplete?: () => voi
     setError(null)
 
     try {
-      // Call the real contract
-      const tx = await registerAgent(
-        { publicKey, signTransaction },
-        name.trim(),
-        agentType,  // IDL field, contract ignores but keeps for compatibility
-        skills.trim(),
-        0  // hourlyRate: contract ignores, pass 0
-      )
+      // Call the contract — initializeWorkerProfile takes no args
+      const tx = await initializeWorkerProfile({ publicKey, signTransaction })
 
       // Confirm transaction
       await connection.confirmTransaction(tx, 'confirmed')

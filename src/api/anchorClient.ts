@@ -167,14 +167,13 @@ export function findTokenEscrowPda(task: PublicKey): PublicKey {
   return pda
 }
 
-/** Escrow token account PDA: seeds = [escrow_token_account, task] */
-export function findEscrowTokenAccountPda(task: PublicKey): PublicKey {
+/** Escrow token account (ATA of token_escrow PDA): seeds = [token_escrow, task, "token"] */
+export function findEscrowTokenAccountPda(task: PublicKey): { pda: PublicKey; bump: number } {
   const [pda, bump] = PublicKey.findProgramAddressSync(
-    [Buffer.from('escrow_token_account'), task.toBuffer()],
+    [Buffer.from('token_escrow'), task.toBuffer(), Buffer.from('token')],
     PROGRAM_ID,
   )
-  if (bump === undefined) throw new Error('EscrowTokenAccount PDA derivation failed')
-  return pda
+  return { pda, bump }
 }
 
 // ─── Instruction Callers ───────────────────────────────────────────────────────
@@ -188,9 +187,13 @@ export async function initializePlatform(wallet: {
 }): Promise<string> {
   if (!wallet?.publicKey) throw new Error('WALLET_NOT_CONNECTED')
   const program = getProgram(wallet)
+  const treasury = findTreasuryPda()
   try {
-    // IDL instruction name is "initialize", not "initializePlatform"
-    return await program.methods.initialize().rpc()
+    return await program.methods.initializePlatform().accounts({
+      authority: wallet.publicKey,
+      treasury,
+      systemProgram: PublicKey.default,
+    } as never).rpc()
   } catch (err) {
     const { userMsg, code } = classifyChainError(err)
     console.error(`[anchorClient] initialize error [${code}]:`, err)
@@ -199,31 +202,27 @@ export async function initializePlatform(wallet: {
 }
 
 /**
- * registerAgent — create an agent profile for the signing wallet.
- * IDL instruction name: "registerAgent"
+ * initializeWorkerProfile — create an agent profile for the signing wallet.
+ * Contract instruction: initialize_worker_profile (no args).
+ * Profile stores reputation, tier, skills, earnings on-chain.
+ * Name/skills metadata stored locally in localStorage.
  */
-export async function registerAgent(
-  wallet: {
-    signTransaction: <T extends Transaction>(tx: T) => Promise<T>
-    publicKey: PublicKey
-  },
-  name: string,
-  agentType: string,
-  skills: string,
-  hourlyRate: number,
-): Promise<string> {
+export async function initializeWorkerProfile(wallet: {
+  signTransaction: <T extends Transaction>(tx: T) => Promise<T>
+  publicKey: PublicKey
+}): Promise<string> {
   if (!wallet?.publicKey) throw new Error('WALLET_NOT_CONNECTED')
   const program = getProgram(wallet)
-  const agentProfile = findAgentProfilePda(wallet.publicKey)
+  const workerProfile = findAgentProfilePda(wallet.publicKey)
   try {
-    return await program.methods.registerAgent(name, agentType, skills, hourlyRate).accounts({
-      authority: wallet.publicKey,
-      agentProfile,
+    return await program.methods.initializeWorkerProfile().accounts({
+      owner: wallet.publicKey,
+      workerProfile,
       systemProgram: PublicKey.default,
     } as never).rpc()
   } catch (err) {
     const { userMsg, code } = classifyChainError(err)
-    console.error(`[anchorClient] registerAgent error [${code}]:`, err)
+    console.error(`[anchorClient] initializeWorkerProfile error [${code}]:`, err)
     throw new Error(userMsg)
   }
 }
@@ -317,7 +316,7 @@ export async function createTaskToken(
 
   try {
     return await program.methods
-      .createTaskToken(title, description, requiredSkills, reward, verificationPeriod)
+      .createTaskToken(title, description, requiredSkills, reward, verificationPeriod, tokenMint)
       .accounts({
         creator: wallet.publicKey,
         task,
@@ -325,8 +324,10 @@ export async function createTaskToken(
         creatorTokenAccount,
         escrowTokenAccount,
         tokenMint,
-        tokenProgram: new PublicKey('TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb'), // Token-2022
+        tokenProgram: new PublicKey('TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb'),
+        clock: PublicKey.default,
         systemProgram: PublicKey.default,
+        rent: PublicKey.default,
       } as never)
       .rpc()
   } catch (err) {
@@ -722,7 +723,7 @@ export async function cancelTaskToken(
   if (!wallet?.publicKey) throw new Error('WALLET_NOT_CONNECTED')
   const program = getProgram(wallet)
   const tokenEscrow = findTokenEscrowPda(task)
-  const escrowTokenAccount = findEscrowTokenAccountPda(task)
+  const escrowTokenAccount = findEscrowTokenAccountPda(task).pda
   const creatorTokenAccount = getAssociatedTokenAddressSync(tokenMint, wallet.publicKey)
   try {
     return await program.methods.cancelTaskToken().accounts({
@@ -753,7 +754,7 @@ export async function disputeTaskToken(
   if (!wallet?.publicKey) throw new Error('WALLET_NOT_CONNECTED')
   const program = getProgram(wallet)
   const tokenEscrow = findTokenEscrowPda(task)
-  const escrowTokenAccount = findEscrowTokenAccountPda(task)
+  const escrowTokenAccount = findEscrowTokenAccountPda(task).pda
   const workerTokenAccount = getAssociatedTokenAddressSync(tokenMint, worker)
   const treasuryPda = findTreasuryPda()
   const treasuryTokenAccount = getAssociatedTokenAddressSync(tokenMint, treasuryPda, true)
