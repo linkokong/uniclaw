@@ -73,6 +73,8 @@ export interface Task {
   publisher: TaskPublisher | null
   worker?: TaskPublisher | null  // Added for assigned worker
   acceptanceCriteria?: string[]
+  paymentType?: PaymentType
+  tokenMint?: string
 }
 
 export interface TaskPublisher {
@@ -236,6 +238,8 @@ export interface Transaction {
 // ---------- Chain-onchain Types ----------
 
 /** Raw Task account as returned by Anchor */
+export type PaymentType = 'sol' | 'token'
+
 export interface ChainTask {
   creator: string
   worker: string
@@ -252,6 +256,8 @@ export interface ChainTask {
   category: string
   submissionUri: string
   bump: number
+  paymentType?: PaymentType
+  tokenMint?: string
 }
 
 /** Status enum mapping (matches contract) */
@@ -267,7 +273,9 @@ export const CHAIN_TASK_STATUS: Record<number, FrontendTaskStatus> = {
 /** Convert raw chain Task → frontend Task */
 export function chainTaskToTask(pda: string, t: ChainTask): Task {
   const rewardU64 = typeof t.reward === 'string' ? t.reward : String(t.reward ?? 0)
-  const rewardNum = Number(BigInt(rewardU64) / BigInt(1e9)) // lamports → SOL
+  const isToken = t.paymentType === 'token'
+  // Token rewards are in raw amount (9 decimals for UNIC); SOL rewards are in lamports (9 decimals)
+  const rewardNum = Number(BigInt(rewardU64) / BigInt(1e9))
   const status: FrontendTaskStatus = CHAIN_TASK_STATUS[t.status] ?? 'open'
   return {
     id: pda,
@@ -288,6 +296,8 @@ export function chainTaskToTask(pda: string, t: ChainTask): Task {
     worker: t.worker && t.worker !== '11111111111111111111111111111111'
       ? { address: t.worker, reputation: 0, tasksCompleted: 0, tasksFailed: 0, joinedDays: 0 }
       : undefined,
+    paymentType: isToken ? 'token' : 'sol',
+    tokenMint: t.tokenMint,
   }
 }
 

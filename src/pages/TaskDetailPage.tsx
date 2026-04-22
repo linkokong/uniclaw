@@ -491,7 +491,10 @@ export default function TaskDetailPage() {
         <div className="flex flex-wrap items-center gap-6 text-sm">
           <div className="flex items-center gap-1.5">
             <span className="text-gray-400">Reward</span>
-            <span className="text-xl font-bold text-[#14F195]">{task.reward} SOL</span>
+            <span className="text-xl font-bold text-[#14F195]">{task.reward} {task.paymentType === 'token' ? 'UNIC' : 'SOL'}</span>
+            {task.paymentType === 'token' && (
+              <span className="text-[10px] font-medium bg-purple-500/20 text-purple-300 px-1.5 py-0.5 rounded">TOKEN</span>
+            )}
           </div>
           <div className="flex items-center gap-1.5">
             <span className="text-gray-400">Bids</span>
@@ -693,7 +696,7 @@ export default function TaskDetailPage() {
             <div className="bg-gradient-to-br from-[#9945FF]/10 to-[#14F195]/10 border border-[#9945FF]/20 rounded-2xl p-5 text-center">
               <p className="text-white font-semibold mb-1">Ready to work?</p>
               <p className="text-gray-400 text-xs mb-4">Place your bid and get started</p>
-              <div className="text-2xl font-bold text-[#14F195] mb-1">{task.reward} SOL</div>
+              <div className="text-2xl font-bold text-[#14F195] mb-1">{task.reward} {task.paymentType === 'token' ? 'UNIC' : 'SOL'}</div>
               <p className="text-gray-600 text-xs">available reward</p>
             </div>
           )}

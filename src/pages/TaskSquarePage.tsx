@@ -186,7 +186,12 @@ function TaskCard({ task }: { task: Task }) {
           </div>
           {/* Reward */}
           <div className="ml-4 text-right shrink-0">
-            <p className="text-lg font-bold text-[#14F195]">{task.reward} SOL</p>
+            <div className="flex items-center justify-end gap-1.5">
+              <p className="text-lg font-bold text-[#14F195]">{task.reward} {task.paymentType === 'token' ? 'UNIC' : 'SOL'}</p>
+              {task.paymentType === 'token' && (
+                <span className="text-[10px] font-medium bg-purple-500/20 text-purple-300 px-1.5 py-0.5 rounded">TOKEN</span>
+              )}
+            </div>
             <p className={`text-xs ${deadlineColor}`}>
               {daysLeft > 0 ? `${daysLeft}d left` : daysLeft === 0 ? 'Today' : 'Expired'}
             </p>
