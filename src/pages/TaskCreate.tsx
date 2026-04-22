@@ -6,7 +6,11 @@
 import { useState, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useWallet } from '@solana/wallet-adapter-react'
-import { createTask } from '../api/task'
+import { createTaskOnChain, createTaskTokenOnChain } from '../utils/anchor'
+import { TOKENS } from '../utils/tokens'
+
+// ─── Payment Type ─────────────────────────────────────────────────────────
+type PaymentType = 'SOL' | 'UNICLAW'
 
 // ─── Available Skills Pool ─────────────────────────────────────────────────
 const ALL_SKILLS = [
@@ -35,6 +39,7 @@ interface FormData {
   category: string
   skills: string[]
   acceptanceCriteria: string
+  paymentType: PaymentType
 }
 
 interface FormErrors {
@@ -66,8 +71,8 @@ function validate(data: FormData, _hasAttachment: boolean): FormErrors {
   const reward = parseFloat(data.reward)
   if (!data.reward) {
     errors.reward = 'Reward amount is required'
-  } else if (isNaN(reward) || reward < 0.01) {
-    errors.reward = 'Minimum reward is 0.01 SOL'
+  } else if (isNaN(reward) || (data.paymentType === 'SOL' && reward < 0.01) || (data.paymentType === 'UNICLAW' && reward < 1)) {
+    errors.reward = data.paymentType === 'SOL' ? 'Minimum reward is 0.01 SOL' : 'Minimum reward is 1 UNIC'
   }
 
   if (!data.deadline) {
@@ -412,7 +417,7 @@ function FileUpload({ onFiles }: { onFiles: (files: File[]) => void }) {
 // ─── Main Page ──────────────────────────────────────────────────────────────
 export function TaskCreatePage() {
   const navigate = useNavigate()
-  const { connected } = useWallet()
+  const wallet = useWallet()
 
   const [form, setForm] = useState<FormData>({
     title: '',
@@ -422,6 +427,7 @@ export function TaskCreatePage() {
     category: '',
     skills: [],
     acceptanceCriteria: '',
+    paymentType: 'SOL',
   })
   const [errors, setErrors] = useState<FormErrors>({})
   const [files, setFiles] = useState<File[]>([])
@@ -452,7 +458,7 @@ export function TaskCreatePage() {
       return
     }
 
-    if (!connected) {
+    if (!wallet.connected) {
       setErrors({ title: 'Please connect your wallet to create a task' })
       return
     }
@@ -461,16 +467,31 @@ export function TaskCreatePage() {
     setServerError(null)
 
     try {
-      const task = await createTask({
-        title: form.title.trim(),
-        description: form.description.trim(),
-        required_skills: form.skills,
-        reward: form.reward,
-        verification_period: 3,
-      })
-
-      // Navigate to the newly created task detail page
-      navigate(`/tasks/${task.id}`)
+      const walletAdapter = wallet as never
+      if (form.paymentType === 'UNICLAW') {
+        // UNICLAW token task
+        const rewardRaw = Math.round(parseFloat(form.reward) * 10 ** TOKENS.UNICLAW.decimals)
+        await createTaskTokenOnChain(
+          walletAdapter,
+          form.title.trim(),
+          form.description.trim(),
+          form.skills,
+          rewardRaw,
+          604800, // 7 days verification period
+        )
+      } else {
+        // SOL task
+        const rewardLamports = Math.round(parseFloat(form.reward) * 1e9)
+        await createTaskOnChain(
+          walletAdapter,
+          form.title.trim(),
+          form.description.trim(),
+          form.skills,
+          rewardLamports,
+          604800,
+        )
+      }
+      navigate('/tasks')
     } catch (err) {
       setServerError(err instanceof Error ? err.message : 'Failed to create task. Please try again.')
       setSubmitting(false)
@@ -500,7 +521,7 @@ export function TaskCreatePage() {
       </div>
 
       {/* ── Wallet Warning ── */}
-      {!connected && (
+      {!wallet.connected && (
         <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-2xl p-4 flex items-center gap-3">
           <span className="text-xl">🔒</span>
           <div>
@@ -566,28 +587,75 @@ export function TaskCreatePage() {
           <p className="text-xs text-gray-600 mt-1.5">{form.description.length} characters — be specific about requirements and deliverables</p>
         </div>
 
+        {/* Payment Type */}
+        <div>
+          <label className="block text-sm font-medium text-gray-300 mb-2">
+            Payment Method <span className="text-red-400">*</span>
+          </label>
+          <div className="flex gap-3">
+            <button
+              type="button"
+              onClick={() => { setField('paymentType', 'SOL'); setField('reward', '') }}
+              className={`flex-1 px-4 py-3 rounded-xl border text-sm font-medium transition-all ${
+                form.paymentType === 'SOL'
+                  ? 'bg-[#9945FF]/15 border-[#9945FF]/40 text-white'
+                  : 'bg-gray-900/40 border-gray-700/50 text-gray-400 hover:border-gray-600'
+              }`}
+            >
+              <div className="flex items-center justify-center gap-2">
+                <span className="text-lg">◎</span>
+                <div className="text-left">
+                  <div className="font-semibold">SOL</div>
+                  <div className="text-xs opacity-60">Solana native token</div>
+                </div>
+              </div>
+            </button>
+            <button
+              type="button"
+              onClick={() => { setField('paymentType', 'UNICLAW'); setField('reward', '') }}
+              className={`flex-1 px-4 py-3 rounded-xl border text-sm font-medium transition-all ${
+                form.paymentType === 'UNICLAW'
+                  ? 'bg-[#14F195]/10 border-[#14F195]/40 text-white'
+                  : 'bg-gray-900/40 border-gray-700/50 text-gray-400 hover:border-gray-600'
+              }`}
+            >
+              <div className="flex items-center justify-center gap-2">
+                <span className="text-lg">🦄</span>
+                <div className="text-left">
+                  <div className="font-semibold">UNICLAW</div>
+                  <div className="text-xs opacity-60">Platform token (UNIC)</div>
+                </div>
+              </div>
+            </button>
+          </div>
+        </div>
+
         {/* Reward + Deadline Row */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div id="field-reward">
             <label className="block text-sm font-medium text-gray-300 mb-2">
-              Reward (SOL) <span className="text-red-400">*</span>
+              Reward ({form.paymentType === 'SOL' ? 'SOL' : 'UNIC'}) <span className="text-red-400">*</span>
             </label>
             <div className="relative">
               <input
                 type="number"
                 value={form.reward}
                 onChange={e => setField('reward', e.target.value)}
-                placeholder="0.00"
-                min="0.01"
-                step="0.01"
+                placeholder={form.paymentType === 'SOL' ? '0.01' : '100'}
+                min={form.paymentType === 'SOL' ? '0.01' : '1'}
+                step={form.paymentType === 'SOL' ? '0.01' : '1'}
                 className={`w-full px-4 py-3 bg-gray-900/50 border rounded-xl text-sm text-white placeholder-gray-600 focus:outline-none transition-all ${
                   errors.reward ? 'border-red-500/60' : 'border-gray-700/50 focus:border-[#9945FF]/50'
                 }`}
               />
-              <span className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-500 text-sm">SOL</span>
+              <span className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-500 text-sm">
+                {form.paymentType === 'SOL' ? 'SOL' : 'UNIC'}
+              </span>
             </div>
             {errors.reward && <FieldError message={errors.reward} />}
-            <p className="text-xs text-gray-600 mt-1.5">Minimum 0.01 SOL</p>
+            <p className="text-xs text-gray-600 mt-1.5">
+              {form.paymentType === 'SOL' ? 'Minimum 0.01 SOL' : 'Minimum 1 UNIC · Devnet tokens only'}
+            </p>
           </div>
 
           <div id="field-deadline">
@@ -682,7 +750,7 @@ export function TaskCreatePage() {
           >
             Cancel
           </button>
-          {!connected && (
+          {!wallet.connected && (
             <p className="text-xs text-gray-600 text-center sm:text-left">
               Connect wallet to publish
             </p>

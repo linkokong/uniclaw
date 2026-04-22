@@ -1,4 +1,6 @@
 use anchor_lang::{declare_id, prelude::*};
+use anchor_lang::solana_program::program::invoke_signed;
+use anchor_spl::token;
 use solana_program::hash::hashv;
 
 // ============================================================
@@ -7,6 +9,7 @@ use solana_program::hash::hashv;
 
 pub const PLATFORM_FEE_BPS: u16 = 1500;
 pub const ESCROW_PREFIX: &[u8] = b"escrow";
+pub const TOKEN_ESCROW_PREFIX: &[u8] = b"token_escrow";
 pub const BID_SEED: &[u8] = b"bid";
 pub const TREASURY_SEED: &[u8] = b"platform_treasury";
 pub const AGENT_PROFILE_SEED: &[u8] = b"agent_profile";
@@ -118,9 +121,17 @@ impl Default for AgentTier {
     }
 }
 
+/// Payment type for tasks — SOL or SPL Token (UNICLAW)
+#[derive(AnchorSerialize, AnchorDeserialize, Clone, PartialEq, Eq, Default)]
+pub enum PaymentType {
+    #[default]
+    Sol,           // Native SOL
+    SplToken,      // SPL Token (UNICLAW)
+}
+
 /// Task account — the core work unit in the marketplace.
-/// PDA seed: [TASK_SEED, creator.key().as_ref(), task_bump]
-/// Space: 8 + 1622 ≈ 1630 bytes
+/// PDA seed: [TASK_SEED, creator.key().as_ref(), title_hash]
+/// Space: 8 + 1654 ≈ 1662 bytes
 #[account]
 pub struct Task {
     pub creator: Pubkey,                       // 32 — task creator's public key
@@ -130,6 +141,10 @@ pub struct Task {
     pub required_skills: Vec<String>,           // 4 + (10 × 64)
     pub status: TaskStatus,                      // 1
     pub reward: u64,                            // 8
+    /// Payment type: SOL or SPL Token (UNICLAW)
+    pub payment_type: PaymentType,              // 1
+    /// Token mint address for SPL Token payments (zeroed for SOL)
+    pub token_mint: Pubkey,                     // 32
     pub verification_deadline: i64,              // 8 — unix timestamp
     pub submission_time: Option<i64>,            // 9
     pub verification_time: Option<i64>,         // 9
@@ -143,7 +158,7 @@ pub struct Task {
 }
 
 impl Task {
-    pub const MAX_SIZE: usize = 32 + 32 + 4 + 100 + 4 + 1000 + 4 + 64 + 1 + 8 + 9 + 9 + 1 + 4 + 4 + 8 + 8;
+    pub const MAX_SIZE: usize = 32 + 32 + 4 + 100 + 4 + 1000 + 4 + 64 + 1 + 8 + 1 + 32 + 8 + 9 + 9 + 1 + 4 + 4 + 8 + 8;
     pub fn space() -> usize { 8 + Self::MAX_SIZE }
 }
 
@@ -159,6 +174,21 @@ pub struct TaskEscrow {
 
 impl TaskEscrow {
     pub const MAX_SIZE: usize = 32 + 8 + 1;
+    pub fn space() -> usize { 8 + Self::MAX_SIZE }
+}
+
+/// Token Escrow account — holds SPL Token (UNICLAW) rewards in custody.
+/// PDA seed: [TOKEN_ESCROW_PREFIX, task.key().as_ref()]
+/// The actual token balance is held in an associated token account owned by this PDA.
+#[account]
+pub struct TokenEscrow {
+    pub task: Pubkey,       // 32 — points back to the task
+    pub token_mint: Pubkey, // 32 — SPL Token mint address (UNICLAW)
+    pub bump: u8,           // 1
+}
+
+impl TokenEscrow {
+    pub const MAX_SIZE: usize = 32 + 32 + 1;
     pub fn space() -> usize { 8 + Self::MAX_SIZE }
 }
 
@@ -285,12 +315,15 @@ pub mod task_contract {
         task.required_skills = required_skills;
         task.status = TaskStatus::Created;
         task.reward = reward;
+        task.payment_type = PaymentType::Sol;
+        task.token_mint = Pubkey::default();
         task.verification_deadline = clock.unix_timestamp + verification_period;
         task.submission_time = None;
         task.verification_time = None;
         task.bump = ctx.bumps.task;
         task.created_at = clock.unix_timestamp;
         task.worker_reputation_at_assignment = 0;
+        task.accepted_bid_deposit = 0;
 
         ctx.accounts.escrow.task = task.key();
         ctx.accounts.escrow.balance = reward;
@@ -304,6 +337,95 @@ pub mod task_contract {
             },
         );
         anchor_lang::system_program::transfer(cpi_ctx, reward)?;
+
+        emit!(TaskCreated {
+            task: ctx.accounts.task.key(),
+            creator: ctx.accounts.creator.key(),
+            reward,
+            title: ctx.accounts.task.title.clone(),
+        });
+        Ok(())
+    }
+
+    /// Create a task with SPL Token (UNICLAW) reward
+    pub fn create_task_token(
+        ctx: Context<CreateTaskToken>,
+        title: String,
+        description: String,
+        required_skills: Vec<String>,
+        reward: u64,
+        verification_period: i64,
+        token_mint: Pubkey,
+    ) -> Result<()> {
+        require!(!title.is_empty(), TaskError::ZeroReward);
+        require!(title.len() <= MAX_TITLE_LENGTH, TaskError::ZeroReward);
+        require!(description.len() <= MAX_DESCRIPTION_LENGTH, TaskError::ZeroReward);
+        require!(required_skills.len() <= MAX_TASK_SKILLS, TaskError::ZeroReward);
+        require!(reward > 0, TaskError::ZeroReward);
+        require!(
+            verification_period >= DEFAULT_VERIFICATION_PERIOD
+                && verification_period <= MAX_VERIFICATION_PERIOD,
+            TaskError::ZeroReward
+        );
+
+        let task = &mut ctx.accounts.task;
+        let clock = Clock::get()?;
+        task.creator = ctx.accounts.creator.key();
+        task.worker = Pubkey::default();
+        task.title = title;
+        task.description = description;
+        task.required_skills = required_skills;
+        task.status = TaskStatus::Created;
+        task.reward = reward;
+        task.payment_type = PaymentType::SplToken;
+        task.token_mint = token_mint;
+        task.verification_deadline = clock.unix_timestamp + verification_period;
+        task.submission_time = None;
+        task.verification_time = None;
+        task.bump = ctx.bumps.task;
+        task.created_at = clock.unix_timestamp;
+        task.worker_reputation_at_assignment = 0;
+        task.accepted_bid_deposit = 0;
+
+        ctx.accounts.token_escrow.task = task.key();
+        ctx.accounts.token_escrow.token_mint = token_mint;
+        ctx.accounts.token_escrow.bump = ctx.bumps.token_escrow;
+
+        // Transfer SPL tokens from creator to the escrow's token account
+        // Using native Solana invoke for SPL Token transfer
+        use anchor_lang::solana_program::program::invoke;
+        use anchor_lang::solana_program::instruction::{Instruction, AccountMeta};
+        
+        let transfer_instruction = Instruction {
+            program_id: *ctx.accounts.token_program.to_account_info().key,
+            accounts: vec![
+                AccountMeta::new(
+                    *ctx.accounts.creator_token_account.to_account_info().key, false
+                ),
+                AccountMeta::new(
+                    *ctx.accounts.escrow_token_account.to_account_info().key, false
+                ),
+                AccountMeta::new_readonly(
+                    *ctx.accounts.creator.to_account_info().key, true
+                ),
+            ],
+            data: {
+                // SPL Token Transfer instruction: [3, amount as little-endian 8 bytes]
+                let mut data = vec![3u8]; // Transfer instruction discriminator
+                data.extend_from_slice(&reward.to_le_bytes());
+                data
+            },
+        };
+        
+        invoke(
+            &transfer_instruction,
+            &[
+                ctx.accounts.creator_token_account.to_account_info(),
+                ctx.accounts.escrow_token_account.to_account_info(),
+                ctx.accounts.creator.to_account_info(),
+                ctx.accounts.token_program.to_account_info(),
+            ],
+        )?;
 
         emit!(TaskCreated {
             task: ctx.accounts.task.key(),
@@ -620,6 +742,279 @@ pub mod task_contract {
         Ok(())
     }
 
+    /// Verify a task with SPL Token (UNICLAW) reward
+    pub fn verify_task_token(ctx: Context<VerifyTaskToken>, approved: bool) -> Result<()> {
+        let task = &mut ctx.accounts.task;
+        let worker_profile = &mut ctx.accounts.worker_profile;
+        require!(task.status == TaskStatus::Completed, TaskError::InvalidTaskState);
+        require!(ctx.accounts.creator.key() == task.creator, TaskError::NotTaskCreator);
+        let clock = Clock::get()?;
+        require!(clock.unix_timestamp <= task.verification_deadline, TaskError::VerificationDeadlineExceeded);
+        
+        let total_reward = task.reward;
+        let fee_amount = (total_reward as u128)
+            .checked_mul(ctx.accounts.treasury.fee_basis_points as u128)
+            .ok_or(TaskError::ArithmeticOverflow)?
+            .checked_div(10000)
+            .ok_or(TaskError::ArithmeticOverflow)? as u64;
+        let worker_reward = total_reward.checked_sub(fee_amount).ok_or(TaskError::ArithmeticOverflow)?;
+        let task_key = task.key();
+        let worker_key = task.worker;
+
+        if approved {
+            // Transfer worker_reward SPL tokens from escrow to worker
+            use anchor_lang::solana_program::program::invoke;
+            use anchor_lang::solana_program::instruction::{Instruction, AccountMeta};
+            
+            // Transfer to worker
+            let transfer_to_worker = Instruction {
+                program_id: *ctx.accounts.token_program.to_account_info().key,
+                accounts: vec![
+                    AccountMeta::new(*ctx.accounts.escrow_token_account.to_account_info().key, false),
+                    AccountMeta::new(*ctx.accounts.worker_token_account.to_account_info().key, false),
+                    AccountMeta::new_readonly(*ctx.accounts.token_escrow.to_account_info().key, true),
+                ],
+                data: {
+                    let mut data = vec![3u8]; // Transfer
+                    data.extend_from_slice(&worker_reward.to_le_bytes());
+                    data
+                },
+            };
+            
+            // PDA signer seeds for token_escrow
+            let seeds = &[
+                TOKEN_ESCROW_PREFIX,
+                task_key.as_ref(),
+                &[ctx.accounts.token_escrow.bump],
+            ];
+            let signer_seeds = &[&seeds[..]];
+            
+            invoke_signed(
+                &transfer_to_worker,
+                &[
+                    ctx.accounts.escrow_token_account.to_account_info(),
+                    ctx.accounts.worker_token_account.to_account_info(),
+                    ctx.accounts.token_escrow.to_account_info(),
+                    ctx.accounts.token_program.to_account_info(),
+                ],
+                signer_seeds,
+            )?;
+            
+            // Transfer fee to treasury token account
+            let transfer_fee = Instruction {
+                program_id: *ctx.accounts.token_program.to_account_info().key,
+                accounts: vec![
+                    AccountMeta::new(*ctx.accounts.escrow_token_account.to_account_info().key, false),
+                    AccountMeta::new(*ctx.accounts.treasury_token_account.to_account_info().key, false),
+                    AccountMeta::new_readonly(*ctx.accounts.token_escrow.to_account_info().key, true),
+                ],
+                data: {
+                    let mut data = vec![3u8];
+                    data.extend_from_slice(&fee_amount.to_le_bytes());
+                    data
+                },
+            };
+            
+            invoke_signed(
+                &transfer_fee,
+                &[
+                    ctx.accounts.escrow_token_account.to_account_info(),
+                    ctx.accounts.treasury_token_account.to_account_info(),
+                    ctx.accounts.token_escrow.to_account_info(),
+                    ctx.accounts.token_program.to_account_info(),
+                ],
+                signer_seeds,
+            )?;
+
+            worker_profile.tasks_completed = worker_profile.tasks_completed.saturating_add(1);
+            worker_profile.total_earnings = worker_profile.total_earnings.saturating_add(worker_reward);
+            let new_rep = worker_profile.reputation.saturating_add(REPUTATION_INCREASE_COMPLETED);
+            worker_profile.reputation = new_rep.min(MAX_REPUTATION);
+            worker_profile.tier = if new_rep <= TIER_BRONZE_MAX_REPUTATION {
+                AgentTier::Bronze
+            } else if new_rep <= TIER_SILVER_MAX_REPUTATION {
+                AgentTier::Silver
+            } else if new_rep <= TIER_GOLD_MAX_REPUTATION {
+                AgentTier::Gold
+            } else {
+                AgentTier::Platinum
+            };
+            task.status = TaskStatus::Verified;
+            task.verification_time = Some(clock.unix_timestamp);
+            ctx.accounts.treasury.total_fees_collected = ctx.accounts.treasury.total_fees_collected.saturating_add(fee_amount);
+            emit!(TaskVerified {
+                task: task_key,
+                worker: worker_key,
+                approved: true,
+                worker_reward,
+                fee_amount,
+            });
+        } else {
+            task.status = TaskStatus::InProgress;
+            task.submission_time = None;
+            emit!(TaskVerified {
+                task: task_key,
+                worker: worker_key,
+                approved: false,
+                worker_reward: 0,
+                fee_amount: 0,
+            });
+        }
+        Ok(())
+    }
+
+    pub fn cancel_task_token(ctx: Context<CancelTaskToken>) -> Result<()> {
+        let task = &mut ctx.accounts.task;
+        require!(task.status == TaskStatus::Created || task.status == TaskStatus::Assigned, TaskError::InvalidTaskState);
+        require!(ctx.accounts.creator.key() == task.creator, TaskError::NotTaskCreator);
+        
+        let total_reward = task.reward;
+        
+        if total_reward > 0 {
+            // Transfer all tokens back to creator
+            use anchor_lang::solana_program::program::invoke;
+            use anchor_lang::solana_program::instruction::{Instruction, AccountMeta};
+            
+            let transfer_back = Instruction {
+                program_id: *ctx.accounts.token_program.to_account_info().key,
+                accounts: vec![
+                    AccountMeta::new(*ctx.accounts.escrow_token_account.to_account_info().key, false),
+                    AccountMeta::new(*ctx.accounts.creator_token_account.to_account_info().key, false),
+                    AccountMeta::new_readonly(*ctx.accounts.token_escrow.to_account_info().key, true),
+                ],
+                data: {
+                    let mut data = vec![3u8]; // Transfer
+                    data.extend_from_slice(&total_reward.to_le_bytes());
+                    data
+                },
+            };
+            
+            let task_key = task.key();
+            let bump = ctx.accounts.token_escrow.bump;
+            let seeds = &[
+                TOKEN_ESCROW_PREFIX,
+                task_key.as_ref(),
+                &[bump],
+            ];
+            let signer_seeds = &[&seeds[..]];
+            
+            invoke_signed(
+                &transfer_back,
+                &[
+                    ctx.accounts.escrow_token_account.to_account_info(),
+                    ctx.accounts.creator_token_account.to_account_info(),
+                    ctx.accounts.token_escrow.to_account_info(),
+                    ctx.accounts.token_program.to_account_info(),
+                ],
+                signer_seeds,
+            )?;
+        }
+        
+        task.status = TaskStatus::Cancelled;
+        emit!(TaskCancelled {
+            task: ctx.accounts.task.key(),
+            creator: ctx.accounts.creator.key(),
+            refunded_amount: total_reward,
+        });
+        Ok(())
+    }
+
+    pub fn dispute_task_token(ctx: Context<DisputeTaskToken>) -> Result<()> {
+        let task = &mut ctx.accounts.task;
+        let worker_profile = &mut ctx.accounts.worker_profile;
+        
+        require!(task.status == TaskStatus::Completed, TaskError::InvalidTaskState);
+        require!(task.submission_time.is_some(), TaskError::InvalidTaskState);
+        let clock = Clock::get()?;
+        require!(clock.unix_timestamp >= task.verification_deadline, TaskError::VerificationDeadlineExceeded);
+        require!(ctx.accounts.worker.key() == task.worker, TaskError::NotTaskWorker);
+
+        let total_reward = task.reward;
+        let fee_amount = (total_reward as u128)
+            .checked_mul(ctx.accounts.treasury.fee_basis_points as u128)
+            .ok_or(TaskError::ArithmeticOverflow)?
+            .checked_div(10000)
+            .ok_or(TaskError::ArithmeticOverflow)? as u64;
+        let worker_reward = total_reward.checked_sub(fee_amount).ok_or(TaskError::ArithmeticOverflow)?;
+        let task_key = task.key();
+        
+        use anchor_lang::solana_program::program::invoke;
+        use anchor_lang::solana_program::instruction::{Instruction, AccountMeta};
+        
+        let seeds = &[
+            TOKEN_ESCROW_PREFIX,
+            task_key.as_ref(),
+            &[ctx.accounts.token_escrow.bump],
+        ];
+        let signer_seeds = &[&seeds[..]];
+        
+        // Transfer worker reward
+        let transfer_worker = Instruction {
+            program_id: *ctx.accounts.token_program.to_account_info().key,
+            accounts: vec![
+                AccountMeta::new(*ctx.accounts.escrow_token_account.to_account_info().key, false),
+                AccountMeta::new(*ctx.accounts.worker_token_account.to_account_info().key, false),
+                AccountMeta::new_readonly(*ctx.accounts.token_escrow.to_account_info().key, true),
+            ],
+            data: {
+                let mut data = vec![3u8];
+                data.extend_from_slice(&worker_reward.to_le_bytes());
+                data
+            },
+        };
+        
+        invoke_signed(
+            &transfer_worker,
+            &[
+                ctx.accounts.escrow_token_account.to_account_info(),
+                ctx.accounts.worker_token_account.to_account_info(),
+                ctx.accounts.token_escrow.to_account_info(),
+                ctx.accounts.token_program.to_account_info(),
+            ],
+            signer_seeds,
+        )?;
+        
+        // Transfer fee to treasury
+        let transfer_fee = Instruction {
+            program_id: *ctx.accounts.token_program.to_account_info().key,
+            accounts: vec![
+                AccountMeta::new(*ctx.accounts.escrow_token_account.to_account_info().key, false),
+                AccountMeta::new(*ctx.accounts.treasury_token_account.to_account_info().key, false),
+                AccountMeta::new_readonly(*ctx.accounts.token_escrow.to_account_info().key, true),
+            ],
+            data: {
+                let mut data = vec![3u8];
+                data.extend_from_slice(&fee_amount.to_le_bytes());
+                data
+            },
+        };
+        
+        invoke_signed(
+            &transfer_fee,
+            &[
+                ctx.accounts.escrow_token_account.to_account_info(),
+                ctx.accounts.treasury_token_account.to_account_info(),
+                ctx.accounts.token_escrow.to_account_info(),
+                ctx.accounts.token_program.to_account_info(),
+            ],
+            signer_seeds,
+        )?;
+
+        worker_profile.tasks_failed = worker_profile.tasks_failed.saturating_add(1);
+        task.status = TaskStatus::Verified;
+        task.verification_time = Some(clock.unix_timestamp);
+        ctx.accounts.treasury.total_fees_collected = ctx.accounts.treasury.total_fees_collected.saturating_add(fee_amount);
+        
+        emit!(TaskDisputeResolved {
+            task: task_key,
+            worker: ctx.accounts.worker.key(),
+            worker_reward,
+            fee_amount,
+            resolution: "deadline_expired_worker_claimed_token".to_string(),
+        });
+        Ok(())
+    }
+
     pub fn cancel_task(ctx: Context<CancelTask>) -> Result<()> {
         let task = &mut ctx.accounts.task;
         let escrow_info = ctx.accounts.escrow.to_account_info();
@@ -751,6 +1146,52 @@ pub struct CreateTask<'info> {
     pub system_program: Program<'info, System>,
 }
 
+/// CreateTaskToken — creates a task with SPL Token (UNICLAW) reward
+#[derive(Accounts)]
+#[instruction(title: String, description: String, required_skills: Vec<String>, reward: u64, verification_period: i64, token_mint: Pubkey)]
+pub struct CreateTaskToken<'info> {
+    #[account(mut)] pub creator: Signer<'info>,
+    #[account(
+        init, 
+        payer = creator, 
+        space = Task::space(), 
+        seeds = [TASK_SEED, creator.key().as_ref(), &hashv(&[title.as_bytes()]).to_bytes()[..8]], 
+        bump
+    )]
+    pub task: Account<'info, Task>,
+    #[account(
+        init,
+        payer = creator,
+        space = TokenEscrow::space(),
+        seeds = [TOKEN_ESCROW_PREFIX, task.key().as_ref()],
+        bump
+    )]
+    pub token_escrow: Account<'info, TokenEscrow>,
+    /// Creator's token account (source of funds)
+    #[account(
+        mut,
+        constraint = creator_token_account.owner == creator.key(),
+        constraint = creator_token_account.mint == token_mint.key()
+    )]
+    pub creator_token_account: Account<'info, anchor_spl::token::TokenAccount>,
+    /// Escrow's token account (holds the reward tokens)
+    #[account(
+        init,
+        payer = creator,
+        token::mint = token_mint,
+        token::authority = token_escrow,
+        seeds = [TOKEN_ESCROW_PREFIX, task.key().as_ref(), b"token"],
+        bump
+    )]
+    pub escrow_token_account: Account<'info, anchor_spl::token::TokenAccount>,
+    /// The SPL Token mint (UNICLAW)
+    pub token_mint: Account<'info, anchor_spl::token::Mint>,
+    pub token_program: Program<'info, anchor_spl::token::Token>,
+    pub clock: Sysvar<'info, Clock>,
+    pub system_program: Program<'info, System>,
+    pub rent: Sysvar<'info, Rent>,
+}
+
 /// SECURITY FIX: worker changed from SystemAccount to Signer.
 /// This ensures the worker must personally consent to being assigned a task.
 #[derive(Accounts)]
@@ -838,6 +1279,77 @@ pub struct VerifyTask<'info> {
     pub escrow: Account<'info, TaskEscrow>,
     #[account(mut)] pub treasury: Account<'info, PlatformTreasury>,
     #[account(mut)] pub worker_profile: Account<'info, AgentProfile>,
+}
+
+/// VerifyTaskToken — verify a task with SPL Token (UNICLAW) reward
+#[derive(Accounts)]
+pub struct VerifyTaskToken<'info> {
+    pub creator: Signer<'info>,
+    pub worker: SystemAccount<'info>,
+    #[account(mut, has_one = creator @ TaskError::NotTaskCreator, has_one = worker @ TaskError::NotTaskWorker)]
+    pub task: Account<'info, Task>,
+    #[account(
+        seeds = [TOKEN_ESCROW_PREFIX, task.key().as_ref()],
+        bump = token_escrow.bump
+    )]
+    pub token_escrow: Account<'info, TokenEscrow>,
+    /// Escrow's token account (holds the reward tokens)
+    #[account(mut)]
+    pub escrow_token_account: Account<'info, anchor_spl::token::TokenAccount>,
+    /// Worker's token account (receives reward)
+    #[account(mut)]
+    pub worker_token_account: Account<'info, anchor_spl::token::TokenAccount>,
+    /// Treasury's token account (receives fee)
+    #[account(mut)]
+    pub treasury_token_account: Account<'info, anchor_spl::token::TokenAccount>,
+    #[account(mut)] pub treasury: Account<'info, PlatformTreasury>,
+    #[account(mut)] pub worker_profile: Account<'info, AgentProfile>,
+    pub token_program: Program<'info, anchor_spl::token::Token>,
+}
+
+/// CancelTaskToken — cancel a task with SPL Token (UNICLAW) reward
+#[derive(Accounts)]
+pub struct CancelTaskToken<'info> {
+    pub creator: Signer<'info>,
+    #[account(mut, has_one = creator @ TaskError::NotTaskCreator)]
+    pub task: Account<'info, Task>,
+    #[account(
+        seeds = [TOKEN_ESCROW_PREFIX, task.key().as_ref()],
+        bump = token_escrow.bump
+    )]
+    pub token_escrow: Account<'info, TokenEscrow>,
+    /// Escrow's token account (holds the reward tokens)
+    #[account(mut)]
+    pub escrow_token_account: Account<'info, anchor_spl::token::TokenAccount>,
+    /// Creator's token account (receives refund)
+    #[account(mut)]
+    pub creator_token_account: Account<'info, anchor_spl::token::TokenAccount>,
+    pub token_program: Program<'info, anchor_spl::token::Token>,
+}
+
+/// DisputeTaskToken — dispute resolution for SPL Token (UNICLAW) tasks
+#[derive(Accounts)]
+pub struct DisputeTaskToken<'info> {
+    pub worker: Signer<'info>,
+    #[account(mut, has_one = worker @ TaskError::NotTaskWorker)]
+    pub task: Account<'info, Task>,
+    #[account(
+        seeds = [TOKEN_ESCROW_PREFIX, task.key().as_ref()],
+        bump = token_escrow.bump
+    )]
+    pub token_escrow: Account<'info, TokenEscrow>,
+    /// Escrow's token account (holds the reward tokens)
+    #[account(mut)]
+    pub escrow_token_account: Account<'info, anchor_spl::token::TokenAccount>,
+    /// Worker's token account (receives reward)
+    #[account(mut)]
+    pub worker_token_account: Account<'info, anchor_spl::token::TokenAccount>,
+    /// Treasury's token account (receives fee)
+    #[account(mut)]
+    pub treasury_token_account: Account<'info, anchor_spl::token::TokenAccount>,
+    #[account(mut)] pub treasury: Account<'info, PlatformTreasury>,
+    #[account(mut)] pub worker_profile: Account<'info, AgentProfile>,
+    pub token_program: Program<'info, anchor_spl::token::Token>,
 }
 
 #[derive(Accounts)]

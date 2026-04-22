@@ -128,12 +128,80 @@
       ]
     },
     {
+      "name": "createTaskToken",
+      "accounts": [
+        { "name": "creator", "isMut": true, "isSigner": true },
+        { "name": "task", "isMut": true, "isSigner": false },
+        { "name": "tokenEscrow", "isMut": true, "isSigner": false },
+        { "name": "creatorTokenAccount", "isMut": true, "isSigner": false },
+        { "name": "escrowTokenAccount", "isMut": true, "isSigner": false },
+        { "name": "tokenMint", "isMut": false, "isSigner": false },
+        { "name": "tokenProgram", "isMut": false, "isSigner": false },
+        { "name": "clock", "isMut": false, "isSigner": false },
+        { "name": "systemProgram", "isMut": false, "isSigner": false },
+        { "name": "rent", "isMut": false, "isSigner": false }
+      ],
+      "args": [
+        { "name": "title", "type": "string" },
+        { "name": "description", "type": "string" },
+        { "name": "reward", "type": "u64" },
+        { "name": "deadline", "type": "i64" },
+        { "name": "skillsRequired", "type": "string" },
+        { "name": "category", "type": "string" }
+      ]
+    },
+    {
+      "name": "verifyTaskToken",
+      "accounts": [
+        { "name": "creator", "isMut": true, "isSigner": true },
+        { "name": "worker", "isMut": false, "isSigner": false },
+        { "name": "task", "isMut": true, "isSigner": false },
+        { "name": "tokenEscrow", "isMut": false, "isSigner": false },
+        { "name": "escrowTokenAccount", "isMut": true, "isSigner": false },
+        { "name": "workerTokenAccount", "isMut": true, "isSigner": false },
+        { "name": "treasuryTokenAccount", "isMut": true, "isSigner": false },
+        { "name": "treasury", "isMut": true, "isSigner": false },
+        { "name": "workerProfile", "isMut": true, "isSigner": false },
+        { "name": "tokenProgram", "isMut": false, "isSigner": false }
+      ],
+      "args": [
+        { "name": "approved", "type": "bool" }
+      ]
+    },
+    {
       "name": "disputeTask",
       "accounts": [
         { "name": "worker", "isMut": true, "isSigner": true },
         { "name": "task", "isMut": true, "isSigner": false },
         { "name": "escrow", "isMut": true, "isSigner": false },
         { "name": "workerProfile", "isMut": true, "isSigner": false }
+      ],
+      "args": []
+    },
+    {
+      "name": "cancelTaskToken",
+      "accounts": [
+        { "name": "creator", "isMut": true, "isSigner": true },
+        { "name": "task", "isMut": true, "isSigner": false },
+        { "name": "tokenEscrow", "isMut": false, "isSigner": false },
+        { "name": "escrowTokenAccount", "isMut": true, "isSigner": false },
+        { "name": "creatorTokenAccount", "isMut": true, "isSigner": false },
+        { "name": "tokenProgram", "isMut": false, "isSigner": false }
+      ],
+      "args": []
+    },
+    {
+      "name": "disputeTaskToken",
+      "accounts": [
+        { "name": "worker", "isMut": true, "isSigner": true },
+        { "name": "task", "isMut": true, "isSigner": false },
+        { "name": "tokenEscrow", "isMut": false, "isSigner": false },
+        { "name": "escrowTokenAccount", "isMut": true, "isSigner": false },
+        { "name": "workerTokenAccount", "isMut": true, "isSigner": false },
+        { "name": "treasuryTokenAccount", "isMut": true, "isSigner": false },
+        { "name": "treasury", "isMut": true, "isSigner": false },
+        { "name": "workerProfile", "isMut": true, "isSigner": false },
+        { "name": "tokenProgram", "isMut": false, "isSigner": false }
       ],
       "args": []
     },
@@ -231,6 +299,8 @@
           { "name": "title", "type": "string" },
           { "name": "description", "type": "string" },
           { "name": "reward", "type": "u64" },
+          { "name": "paymentType", "type": { "defined": "PaymentType" } },
+          { "name": "tokenMint", "type": { "option": "publicKey" } },
           { "name": "status", "type": "u8" },
           { "name": "deadline", "type": "i64" },
           { "name": "verificationDeadline", "type": "i64" },
@@ -287,9 +357,30 @@
           { "name": "balance", "type": "u64" }
         ]
       }
+    },
+    {
+      "name": "TokenEscrow",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          { "name": "task", "type": "publicKey" },
+          { "name": "tokenMint", "type": "publicKey" },
+          { "name": "bump", "type": "u8" }
+        ]
+      }
     }
   ],
   "types": [
+    {
+      "name": "PaymentType",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          { "name": "Sol" },
+          { "name": "SplToken" }
+        ]
+      }
+    },
     {
       "name": "TaskStatus",
       "type": {

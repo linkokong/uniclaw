@@ -8,6 +8,7 @@
 
 import { Connection, PublicKey, Transaction } from '@solana/web3.js'
 import { Program, Idl, AnchorProvider, Provider, Wallet } from '@coral-xyz/anchor'
+import { getAssociatedTokenAddressSync, TOKEN_PROGRAM_ID } from '@solana/spl-token'
 import idlRaw from './idl.json'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -156,6 +157,26 @@ export function findBidPda(task: PublicKey, bidder: PublicKey): PublicKey {
   return pda
 }
 
+/** Token escrow PDA: seeds = [token_escrow, task] */
+export function findTokenEscrowPda(task: PublicKey): PublicKey {
+  const [pda, bump] = PublicKey.findProgramAddressSync(
+    [Buffer.from('token_escrow'), task.toBuffer()],
+    PROGRAM_ID,
+  )
+  if (bump === undefined) throw new Error('TokenEscrow PDA derivation failed')
+  return pda
+}
+
+/** Escrow token account PDA: seeds = [escrow_token_account, task] */
+export function findEscrowTokenAccountPda(task: PublicKey): PublicKey {
+  const [pda, bump] = PublicKey.findProgramAddressSync(
+    [Buffer.from('escrow_token_account'), task.toBuffer()],
+    PROGRAM_ID,
+  )
+  if (bump === undefined) throw new Error('EscrowTokenAccount PDA derivation failed')
+  return pda
+}
+
 // ─── Instruction Callers ───────────────────────────────────────────────────────
 
 /**
@@ -246,6 +267,71 @@ export async function createTask(
   } catch (err) {
     const { userMsg, code } = classifyChainError(err)
     console.error(`[anchorClient] createTask error [${code}]:`, err)
+    throw new Error(userMsg)
+  }
+}
+
+/**
+ * create_task_token — create a new task with SPL Token (UNICLAW) reward.
+ * Uses TokenEscrow PDA instead of SOL escrow.
+ *
+ * @param title               Task title (max 100 chars)
+ * @param description         Task description (max 1000 chars)
+ * @param requiredSkills      List of required skill tags (max 10)
+ * @param reward              Reward in token smallest unit (must be > 0)
+ * @param verificationPeriod  Seconds from now until verification deadline
+ * @param tokenMint           SPL Token mint address (UNICLAW)
+ */
+export async function createTaskToken(
+  wallet: {
+    signTransaction: <T extends Transaction>(tx: T) => Promise<T>
+    publicKey: PublicKey
+  },
+  title: string,
+  description: string,
+  requiredSkills: string[],
+  reward: number,
+  verificationPeriod: number,
+  tokenMint: PublicKey,
+): Promise<string> {
+  if (!wallet?.publicKey) throw new Error('WALLET_NOT_CONNECTED')
+  if (!reward || reward <= 0) throw new Error('INVALID_AMOUNT')
+  const program = getProgram(wallet)
+  const task = findTaskPda(wallet.publicKey, title)
+
+  // Token escrow PDA: seeds = [token_escrow, task]
+  const [tokenEscrow] = PublicKey.findProgramAddressSync(
+    [Buffer.from('token_escrow'), task.toBuffer()],
+    PROGRAM_ID,
+  )
+
+  // Escrow token account PDA: seeds = [token_escrow, task, "token"]
+  const [escrowTokenAccount] = PublicKey.findProgramAddressSync(
+    [Buffer.from('token_escrow'), task.toBuffer(), Buffer.from('token')],
+    PROGRAM_ID,
+  )
+
+  // Get creator's associated token account for the UNICLAW mint
+  const { getAssociatedTokenAddressSync } = await import('@solana/spl-token')
+  const creatorTokenAccount = getAssociatedTokenAddressSync(tokenMint, wallet.publicKey)
+
+  try {
+    return await program.methods
+      .createTaskToken(title, description, requiredSkills, reward, verificationPeriod)
+      .accounts({
+        creator: wallet.publicKey,
+        task,
+        tokenEscrow,
+        creatorTokenAccount,
+        escrowTokenAccount,
+        tokenMint,
+        tokenProgram: new PublicKey('TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb'), // Token-2022
+        systemProgram: PublicKey.default,
+      } as never)
+      .rpc()
+  } catch (err) {
+    const { userMsg, code } = classifyChainError(err)
+    console.error(`[anchorClient] createTaskToken error [${code}]:`, err)
     throw new Error(userMsg)
   }
 }
@@ -508,6 +594,68 @@ export async function verifyTask(
 }
 
 /**
+ * verify_task_token — verify a task with SPL Token (UNICLAW) reward.
+ * Transfers reward tokens to worker and fee to treasury.
+ *
+ * @param approved true  → pay worker in UNICLAW, task verified
+ *                 false → return task to InProgress
+ */
+export async function verifyTaskToken(
+  wallet: {
+    signTransaction: <T extends Transaction>(tx: T) => Promise<T>
+    publicKey: PublicKey
+  },
+  task: PublicKey,
+  worker: PublicKey,
+  workerProfile: PublicKey,
+  tokenMint: PublicKey,
+  approved: boolean,
+): Promise<string> {
+  if (!wallet?.publicKey) throw new Error('WALLET_NOT_CONNECTED')
+  const program = getProgram(wallet)
+  const treasury = findTreasuryPda()
+
+  // Token escrow PDA
+  const [tokenEscrow] = PublicKey.findProgramAddressSync(
+    [Buffer.from('token_escrow'), task.toBuffer()],
+    PROGRAM_ID,
+  )
+
+  // Escrow token account PDA
+  const [escrowTokenAccount] = PublicKey.findProgramAddressSync(
+    [Buffer.from('token_escrow'), task.toBuffer(), Buffer.from('token')],
+    PROGRAM_ID,
+  )
+
+  // Worker & Treasury token accounts
+  const { getAssociatedTokenAddressSync } = await import('@solana/spl-token')
+  const workerTokenAccount = getAssociatedTokenAddressSync(tokenMint, worker)
+  const treasuryTokenAccount = getAssociatedTokenAddressSync(tokenMint, treasury, true)
+
+  try {
+    return await program.methods
+      .verifyTaskToken(approved)
+      .accounts({
+        creator: wallet.publicKey,
+        worker,
+        task,
+        tokenEscrow,
+        escrowTokenAccount,
+        workerTokenAccount,
+        treasuryTokenAccount,
+        treasury,
+        workerProfile,
+        tokenProgram: new PublicKey('TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb'),
+      } as never)
+      .rpc()
+  } catch (err) {
+    const { userMsg, code } = classifyChainError(err)
+    console.error(`[anchorClient] verifyTaskToken error [${code}]:`, err)
+    throw new Error(userMsg)
+  }
+}
+
+/**
  * cancel_task — creator cancels a Created or Assigned task.
  * Any escrowed funds are returned to the creator.
  */
@@ -559,6 +707,71 @@ export async function disputeTask(
   } catch (err: unknown) {
     const { userMsg, code } = classifyChainError(err)
     console.error(`[anchorClient] disputeTask error [${code}]:`, err)
+    throw new Error(userMsg)
+  }
+}
+
+export async function cancelTaskToken(
+  wallet: {
+    signTransaction: <T extends Transaction>(tx: T) => Promise<T>
+    publicKey: PublicKey
+  },
+  task: PublicKey,
+  tokenMint: PublicKey,
+): Promise<string> {
+  if (!wallet?.publicKey) throw new Error('WALLET_NOT_CONNECTED')
+  const program = getProgram(wallet)
+  const tokenEscrow = findTokenEscrowPda(task)
+  const escrowTokenAccount = findEscrowTokenAccountPda(task)
+  const creatorTokenAccount = getAssociatedTokenAddressSync(tokenMint, wallet.publicKey)
+  try {
+    return await program.methods.cancelTaskToken().accounts({
+      creator: wallet.publicKey,
+      task,
+      tokenEscrow,
+      escrowTokenAccount,
+      creatorTokenAccount,
+      tokenProgram: TOKEN_PROGRAM_ID,
+    } as never).rpc()
+  } catch (err: unknown) {
+    const { userMsg, code } = classifyChainError(err)
+    console.error(`[anchorClient] cancelTaskToken error [${code}]:`, err)
+    throw new Error(userMsg)
+  }
+}
+
+export async function disputeTaskToken(
+  wallet: {
+    signTransaction: <T extends Transaction>(tx: T) => Promise<T>
+    publicKey: PublicKey
+  },
+  task: PublicKey,
+  worker: PublicKey,
+  tokenMint: PublicKey,
+  workerProfile: PublicKey,
+): Promise<string> {
+  if (!wallet?.publicKey) throw new Error('WALLET_NOT_CONNECTED')
+  const program = getProgram(wallet)
+  const tokenEscrow = findTokenEscrowPda(task)
+  const escrowTokenAccount = findEscrowTokenAccountPda(task)
+  const workerTokenAccount = getAssociatedTokenAddressSync(tokenMint, worker)
+  const treasuryPda = findTreasuryPda()
+  const treasuryTokenAccount = getAssociatedTokenAddressSync(tokenMint, treasuryPda, true)
+  try {
+    return await program.methods.disputeTaskToken().accounts({
+      worker: wallet.publicKey,
+      task,
+      tokenEscrow,
+      escrowTokenAccount,
+      workerTokenAccount,
+      treasuryTokenAccount,
+      treasury: treasuryPda,
+      workerProfile,
+      tokenProgram: TOKEN_PROGRAM_ID,
+    } as never).rpc()
+  } catch (err: unknown) {
+    const { userMsg, code } = classifyChainError(err)
+    console.error(`[anchorClient] disputeTaskToken error [${code}]:`, err)
     throw new Error(userMsg)
   }
 }

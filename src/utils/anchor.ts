@@ -7,6 +7,7 @@ function hashTitle(title: string): Buffer {
 }
 import {
   createTask as anchorCreateTask,
+  createTaskToken as anchorCreateTaskToken,
   submitBid as anchorSubmitBid,
   acceptBid as anchorAcceptBid,
   rejectBid as anchorRejectBid,
@@ -14,6 +15,7 @@ import {
   startTask as anchorStartTask,
   submitTask as anchorSubmitTask,
   verifyTask as anchorVerifyTask,
+  verifyTaskToken as anchorVerifyTaskToken,
   cancelTask as anchorCancelTask,
   disputeTask as anchorDisputeTask,
   fetchTask,
@@ -67,6 +69,63 @@ export async function createTaskOnChain(
     requiredSkills.slice(0, 10),
     rewardLamports,
     verificationPeriodSec,
+  )
+}
+
+// ─── Create Task with SPL Token (UNICLAW) ────────────────────────────────
+/**
+ * Create a new on-chain task with UNICLAW token reward.
+ *
+ * @param wallet    - Connected wallet adapter
+ * @param title     - Task title (≤ 100 chars)
+ * @param description - Task description (≤ 1000 chars)
+ * @param requiredSkills - Up to 10 skill tags
+ * @param rewardRaw - Reward in token smallest unit (UNICLAW has 9 decimals)
+ * @param verificationPeriodSec - Seconds from now
+ */
+export async function createTaskTokenOnChain(
+  wallet: WalletAdapter,
+  title: string,
+  description: string,
+  requiredSkills: string[],
+  rewardRaw: number,
+  verificationPeriodSec: number,
+): Promise<string> {
+  if (!wallet?.publicKey) throw new Error('Wallet not connected')
+  const { TOKENS } = await import('./tokens')
+  const tokenMint = new PublicKey(TOKENS.UNICLAW.mintAddress)
+  return anchorCreateTaskToken(
+    { signTransaction: wallet.signTransaction as never, publicKey: wallet.publicKey },
+    title.slice(0, 100),
+    description.slice(0, 1000),
+    requiredSkills.slice(0, 10),
+    rewardRaw,
+    verificationPeriodSec,
+    tokenMint,
+  )
+}
+
+// ─── Verify Task with SPL Token (UNICLAW) ────────────────────────────────
+/**
+ * Verify a task that uses UNICLAW token reward.
+ */
+export async function verifyTaskTokenOnChain(
+  wallet: WalletAdapter,
+  taskPda: PublicKey,
+  worker: PublicKey,
+  workerProfile: PublicKey,
+  approved: boolean,
+): Promise<string> {
+  if (!wallet?.publicKey) throw new Error('Wallet not connected')
+  const { TOKENS } = await import('./tokens')
+  const tokenMint = new PublicKey(TOKENS.UNICLAW.mintAddress)
+  return anchorVerifyTaskToken(
+    { signTransaction: wallet.signTransaction as never, publicKey: wallet.publicKey },
+    taskPda,
+    worker,
+    workerProfile,
+    tokenMint,
+    approved,
   )
 }
 
