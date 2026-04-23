@@ -2,6 +2,7 @@ import express from 'express'
 import cors from 'cors'
 import helmet from 'helmet'
 import compression from 'compression'
+import path from 'path'
 import { config } from './config/index.js'
 import { initializeDatabase, closeConnections } from './models/index.js'
 import routes from './routes/index.js'
@@ -37,6 +38,14 @@ app.use(config.apiPrefix, apiLimiter)
 
 // API routes
 app.use(config.apiPrefix, routes)
+
+// Serve built frontend
+const distPath = path.resolve(__dirname, '../../dist')
+app.use(express.static(distPath))
+// Fallback to index.html for SPA routing
+app.get('*', (_, res) => {
+  res.sendFile(path.join(distPath, 'index.html'))
+})
 
 // Error handling
 app.use(notFoundHandler)

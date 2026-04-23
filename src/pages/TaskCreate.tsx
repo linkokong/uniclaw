@@ -10,7 +10,7 @@ import { createTaskOnChain, createTaskTokenOnChain } from '../utils/anchor'
 import { TOKENS } from '../utils/tokens'
 
 // ─── Payment Type ─────────────────────────────────────────────────────────
-type PaymentType = 'SOL' | 'UNICLAW'
+type PaymentType = 'SOL' | 'UNICLAW' | 'USDGO'
 
 // ─── Available Skills Pool ─────────────────────────────────────────────────
 const ALL_SKILLS = [
@@ -71,8 +71,8 @@ function validate(data: FormData, _hasAttachment: boolean): FormErrors {
   const reward = parseFloat(data.reward)
   if (!data.reward) {
     errors.reward = 'Reward amount is required'
-  } else if (isNaN(reward) || (data.paymentType === 'SOL' && reward < 0.01) || (data.paymentType === 'UNICLAW' && reward < 1)) {
-    errors.reward = data.paymentType === 'SOL' ? 'Minimum reward is 0.01 SOL' : 'Minimum reward is 1 UNIC'
+  } else if (isNaN(reward) || (data.paymentType === 'SOL' && reward < 0.01) || (data.paymentType === 'UNICLAW' && reward < 1) || (data.paymentType === 'USDGO' && reward < 0.01)) {
+    errors.reward = data.paymentType === 'SOL' ? 'Minimum reward is 0.01 SOL' : data.paymentType === 'USDGO' ? 'Minimum reward is 0.01 USDGO' : 'Minimum reward is 1 UNIC'
   }
 
   if (!data.deadline) {
@@ -480,7 +480,7 @@ export function TaskCreatePage() {
           604800, // 7 days verification period
         )
       } else {
-        // SOL task
+        // SOL or USDGO task (both use SOL lamports on-chain for now)
         const rewardLamports = Math.round(parseFloat(form.reward) * 1e9)
         await createTaskOnChain(
           walletAdapter,
@@ -627,6 +627,23 @@ export function TaskCreatePage() {
                 </div>
               </div>
             </button>
+            <button
+              type="button"
+              onClick={() => { setField('paymentType', 'USDGO'); setField('reward', '') }}
+              className={`flex-1 px-4 py-3 rounded-xl border text-sm font-medium transition-all ${
+                form.paymentType === 'USDGO'
+                  ? 'bg-[#06B6D4]/10 border-[#06B6D4]/40 text-white'
+                  : 'bg-gray-900/40 border-gray-700/50 text-gray-400 hover:border-gray-600'
+              }`}
+            >
+              <div className="flex items-center justify-center gap-2">
+                <span className="text-lg">💵</span>
+                <div className="text-left">
+                  <div className="font-semibold">USDGO</div>
+                  <div className="text-xs opacity-60">Mainnet stable token</div>
+                </div>
+              </div>
+            </button>
           </div>
         </div>
 
@@ -634,27 +651,27 @@ export function TaskCreatePage() {
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div id="field-reward">
             <label className="block text-sm font-medium text-gray-300 mb-2">
-              Reward ({form.paymentType === 'SOL' ? 'SOL' : 'UNIC'}) <span className="text-red-400">*</span>
+              Reward ({form.paymentType === 'SOL' ? 'SOL' : form.paymentType === 'USDGO' ? 'USDGO' : 'UNIC'}) <span className="text-red-400">*</span>
             </label>
             <div className="relative">
               <input
                 type="number"
                 value={form.reward}
                 onChange={e => setField('reward', e.target.value)}
-                placeholder={form.paymentType === 'SOL' ? '0.01' : '100'}
-                min={form.paymentType === 'SOL' ? '0.01' : '1'}
-                step={form.paymentType === 'SOL' ? '0.01' : '1'}
+                placeholder={form.paymentType === 'USDGO' ? '1' : form.paymentType === 'SOL' ? '0.01' : '100'}
+                min={form.paymentType === 'USDGO' ? '0.01' : form.paymentType === 'SOL' ? '0.01' : '1'}
+                step={form.paymentType === 'USDGO' ? '0.01' : form.paymentType === 'SOL' ? '0.01' : '1'}
                 className={`w-full px-4 py-3 bg-gray-900/50 border rounded-xl text-sm text-white placeholder-gray-600 focus:outline-none transition-all ${
                   errors.reward ? 'border-red-500/60' : 'border-gray-700/50 focus:border-[#9945FF]/50'
                 }`}
               />
               <span className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-500 text-sm">
-                {form.paymentType === 'SOL' ? 'SOL' : 'UNIC'}
+                {form.paymentType === 'SOL' ? 'SOL' : form.paymentType === 'USDGO' ? 'USDGO' : 'UNIC'}
               </span>
             </div>
             {errors.reward && <FieldError message={errors.reward} />}
             <p className="text-xs text-gray-600 mt-1.5">
-              {form.paymentType === 'SOL' ? 'Minimum 0.01 SOL' : 'Minimum 1 UNIC · Devnet tokens only'}
+              {form.paymentType === 'USDGO' ? 'Minimum 0.01 USDGO · Mainnet token' : form.paymentType === 'SOL' ? 'Minimum 0.01 SOL' : 'Minimum 1 UNIC · Devnet tokens only'}
             </p>
           </div>
 

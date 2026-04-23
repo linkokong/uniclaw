@@ -4,21 +4,39 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { ConnectionProvider, WalletProvider } from '@solana/wallet-adapter-react'
 import { PhantomWalletAdapter, SolflareWalletAdapter } from '@solana/wallet-adapter-wallets'
 import { WalletModalProvider } from '@solana/wallet-adapter-react-ui'
+import type { BaseWalletAdapter } from '@solana/wallet-adapter-base'
 import App from './App'
 import './index.css'
 import '@solana/wallet-adapter-react-ui/styles.css'
 
 const queryClient = new QueryClient()
 
-// Solana RPC endpoint
+// Solana RPC endpoint (devnet)
 const endpoint = 'https://api.devnet.solana.com'
-const wallets = [new PhantomWalletAdapter(), new SolflareWalletAdapter()]
+
+// Lazily instantiate adapters — Phantom may not be injected at module load time
+// so we defer until the WalletProvider first renders
+let _wallets: BaseWalletAdapter[] | null = null
+function getWallets(): BaseWalletAdapter[] {
+  if (_wallets) return _wallets
+  const adapters: BaseWalletAdapter[] = []
+  for (const Adapter of [PhantomWalletAdapter, SolflareWalletAdapter]) {
+    try {
+      adapters.push(new Adapter())
+    } catch {
+      // Adapter not available in this browser
+    }
+  }
+  _wallets = adapters
+  console.debug('[Wallet] Available adapters:', adapters.map(a => a.name))
+  return adapters
+}
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
-  // StrictMode removed: PhantomWalletAdapter causes hooks order mismatch with double render
   <QueryClientProvider client={queryClient}>
     <ConnectionProvider endpoint={endpoint}>
-      <WalletProvider wallets={wallets} autoConnect={true}>
+      {/* autoConnect=false: prevents "Provider local is not available" error when no wallet extension is installed */}
+      <WalletProvider wallets={getWallets()} autoConnect={false}>
         <WalletModalProvider>
           <BrowserRouter>
             <App />

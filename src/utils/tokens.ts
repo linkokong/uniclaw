@@ -1,6 +1,5 @@
-// $UNICLAW Token Configuration
-// Created: 2026-04-09
-// Network: Solana Devnet
+// Token Configuration
+// UNICLAW: Solana Devnet | USDGO: Solana Mainnet
 
 export const TOKENS = {
   UNICLAW: {
@@ -9,7 +8,15 @@ export const TOKENS = {
     decimals: 9,
     mintAddress: '5tDoLNETkt8vk3LxJ1NAD564MCfHKtcvmng8BQLDM4a5',
     programId: 'TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb', // Token-2022
-    // Stable pool for UNIC/SOL on Raydium (placeholder — update after pool creation)
+    network: 'devnet' as const,
+    poolAddress: null as string | null,
+  },
+  USDGO: {
+    name: 'USDGO',
+    symbol: 'USDGO',
+    decimals: 6,
+    mintAddress: '72puLt71H93Z9CzHuBRTwFpL4TG3WZUhnoCC7p8gxigu',
+    network: 'mainnet-beta' as const,
     poolAddress: null as string | null,
   },
 } as const

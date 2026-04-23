@@ -14,6 +14,7 @@ import AgentMarketPage from './pages/AgentMarketPage';
 import WalletPage from './pages/WalletPage';
 import LeaderboardPage from './pages/LeaderboardPage';
 import RegisterProfile from './pages/RegisterProfile';
+import LegalPage from './pages/LegalPage';
 
 export default function App() {
   const [showOnboarding, setShowOnboarding] = useState(false);
@@ -49,6 +50,10 @@ export default function App() {
           <Route path="/agents" element={<AgentMarketPage />} />
           <Route path="/wallet" element={<WalletPage />} />
           <Route path="/leaderboard" element={<LeaderboardPage />} />
+          <Route path="/legal/:slug" element={<LegalPage />} />
+          <Route path="/privacy" element={<LegalPage />} />
+          <Route path="/terms" element={<LegalPage />} />
+          <Route path="/about" element={<LegalPage />} />
         </Routes>
       </Layout>
     </>
