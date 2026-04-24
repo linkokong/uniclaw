@@ -285,11 +285,10 @@ export async function disputeTaskOnChain(
  */
 export function deriveTaskPda(creatorAddress: string, title: string): PublicKey {
   const titleHash = hashTitle(title)
-  const [pda, bump] = PublicKey.findProgramAddressSync(
+  const [pda] = PublicKey.findProgramAddressSync(
     [Buffer.from('task'), new PublicKey(creatorAddress).toBuffer(), titleHash],
     ANCHOR_PROGRAM_ID,
   )
-  if (bump === undefined) throw new Error('Task PDA derivation failed')
   return pda
 }
 
@@ -308,11 +307,10 @@ export function deriveBidPda(taskPda: PublicKey, bidderAddress: string): PublicK
  */
 export function deriveTaskPdaFromCreator(creatorAddress: string, title: string): PublicKey {
   const titleHash = hashTitle(title)
-  const [pda, bump] = PublicKey.findProgramAddressSync(
+  const [pda] = PublicKey.findProgramAddressSync(
     [Buffer.from('task'), new PublicKey(creatorAddress).toBuffer(), titleHash],
     ANCHOR_PROGRAM_ID,
   )
-  if (bump === undefined) throw new Error('Task PDA derivation failed')
   return pda
 }
 
@@ -320,11 +318,10 @@ export function deriveTaskPdaFromCreator(creatorAddress: string, title: string):
  * Derive a worker's agent profile PDA.
  */
 export function deriveWorkerProfilePda(workerAddress: string): PublicKey {
-  const [pda, bump] = PublicKey.findProgramAddressSync(
+  const [pda] = PublicKey.findProgramAddressSync(
     [Buffer.from('agent_profile'), new PublicKey(workerAddress).toBuffer()],
     ANCHOR_PROGRAM_ID,
   )
-  if (bump === undefined) throw new Error('Worker Profile PDA derivation failed')
   return pda
 }
 

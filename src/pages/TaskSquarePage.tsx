@@ -1,8 +1,11 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { useWallet } from '@solana/wallet-adapter-react'
 import { Link } from 'react-router-dom'
 // fetchAllTasks removed — using fetchAllTasksWithPdas directly
 import { chainTaskToTask, Task } from '../types/api'
+
+// ─── Auto-refresh interval (30 seconds) ───────────────────────────────────
+const TASK_REFRESH_INTERVAL = 30000 // ms
 
 // ─── Filter Types ─────────────────────────────────────────────────────────
 type TaskType = 'all' | 'open' | 'in_progress'
@@ -241,27 +244,47 @@ export default function TaskSquarePage() {
   const [tasks, setTasks] = useState<Task[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [refreshing, setRefreshing] = useState(false)
+  const cancelledRef = useRef(false)
 
-  useEffect(() => {
-    let cancelled = false
-    setLoading(true)
-    setError(null)
-
-    fetchAllTasksWithPdas()
-      .then((converted) => {
-        if (cancelled || !converted) return
+  // Load tasks function (extracted for reuse in polling)
+  const loadTasks = useCallback(async (isRefresh = false) => {
+    if (isRefresh) setRefreshing(true)
+    try {
+      const converted = await fetchAllTasksWithPdas()
+      if (!cancelledRef.current) {
         setTasks(converted)
-        setLoading(false)
-      })
-      .catch((err) => {
-        if (cancelled) return
+        setError(null)
+      }
+    } catch (err) {
+      if (!cancelledRef.current) {
         console.error('[TaskSquare] fetchAllTasks error:', err)
         setError('Failed to load tasks from chain. Showing demo data.')
+      }
+    } finally {
+      if (!cancelledRef.current) {
         setLoading(false)
-      })
-
-    return () => { cancelled = true }
+        if (isRefresh) setRefreshing(false)
+      }
+    }
   }, [])
+
+  useEffect(() => {
+    setLoading(true)
+    setError(null)
+    loadTasks()
+
+    // Auto-refresh polling every 30 seconds
+    const intervalId = setInterval(() => {
+      console.log('[TaskSquare] Auto-refreshing tasks...')
+      loadTasks()
+    }, TASK_REFRESH_INTERVAL)
+
+    return () => {
+      cancelledRef.current = true
+      clearInterval(intervalId)
+    }
+  }, [loadTasks])
 
   const filtered = tasks
     .filter((t) => {
@@ -312,6 +335,14 @@ export default function TaskSquarePage() {
           <span className="text-base">+</span>
           Post Task
         </Link>
+        <button
+          onClick={() => loadTasks(true)}
+          disabled={refreshing}
+          className="flex items-center gap-2 px-4 py-2.5 bg-gray-800 border border-gray-700 rounded-xl text-sm text-gray-300 hover:bg-gray-700 hover:text-white transition-colors disabled:opacity-50"
+        >
+          <span className={`text-base ${refreshing ? 'animate-spin' : ''}`}>↻</span>
+          {refreshing ? 'Refreshing...' : 'Refresh'}
+        </button>
       </div>
 
       {/* ── Wallet Banner ── */}
