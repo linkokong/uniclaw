@@ -456,10 +456,16 @@ async function fetchAllTasksWithPdas(): Promise<Task[]> {
     const tasks: Task[] = []
     for (const { pubkey, account } of accounts) {
       try {
-        const decoded = TASK_SCHEMA.decode(account.data)
-        if (decoded) {
-          tasks.push(chainTaskToTask(pubkey.toBase58(), decoded as any))
+        const raw = TASK_SCHEMA.decode(account.data)
+        if (!raw) continue
+        // Borsh u64/i64 decode to BN objects — convert to string for chainTaskToTask
+        const decoded: Record<string, any> = {}
+        for (const [k, v] of Object.entries(raw)) {
+          decoded[k] = (v && typeof v === 'object' && typeof (v as any).toString === 'function' && (v as any)._bn !== undefined)
+            ? (v as any).toString()
+            : v
         }
+        tasks.push(chainTaskToTask(pubkey.toBase58(), decoded as any))
       } catch (decodeErr) {
         console.warn('[TaskSquare] Failed to decode account:', pubkey.toBase58(), decodeErr)
       }
