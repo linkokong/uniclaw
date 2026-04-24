@@ -8,7 +8,7 @@ import { chainTaskToTask, Task } from '../types/api'
 const TASK_REFRESH_INTERVAL = 30000 // ms
 
 // ─── Filter Types ─────────────────────────────────────────────────────────
-type TaskType = 'all' | 'open' | 'in_progress'
+type TaskType = 'all' | 'open' | 'assigned' | 'in_progress' | 'submitted'
 type BudgetRange = 'all' | '0-3' | '3-5' | '5-10' | '10+'
 type SortBy = 'newest' | 'deadline' | 'reward' | 'bids'
 
@@ -16,11 +16,12 @@ type SortBy = 'newest' | 'deadline' | 'reward' | 'bids'
 function StatusBadge({ status }: { status: Task['status'] }) {
   const config: Record<string, { label: string; bg: string; text: string; dot: string }> = {
     open:       { label: 'OPEN',        bg: 'bg-emerald-500/15', text: 'text-emerald-400', dot: 'bg-emerald-400' },
+    assigned:   { label: 'ASSIGNED',    bg: 'bg-blue-500/15',    text: 'text-blue-400',    dot: 'bg-blue-400' },
     in_progress:{ label: 'IN PROGRESS', bg: 'bg-yellow-500/15',  text: 'text-yellow-400',  dot: 'bg-yellow-400' },
     submitted:  { label: 'SUBMITTED',   bg: 'bg-blue-500/15',     text: 'text-blue-400',     dot: 'bg-blue-400' },
     completed:  { label: 'COMPLETED',   bg: 'bg-gray-500/15',    text: 'text-gray-400',     dot: 'bg-gray-400' },
     cancelled:  { label: 'CANCELLED',   bg: 'bg-gray-500/15',    text: 'text-gray-500',     dot: 'bg-gray-500' },
-    disputed:  { label: 'DISPUTED',    bg: 'bg-red-500/15',     text: 'text-red-400',      dot: 'bg-red-400' },
+    disputed:   { label: 'DISPUTED',    bg: 'bg-red-500/15',     text: 'text-red-400',      dot: 'bg-red-400' },
   }
   const c = config[status] ?? { label: status.toUpperCase(), bg: 'bg-gray-500/15', text: 'text-gray-400', dot: 'bg-gray-400' }
   return (
@@ -247,14 +248,53 @@ export default function TaskSquarePage() {
   const [refreshing, setRefreshing] = useState(false)
   const cancelledRef = useRef(false)
 
-  // Load tasks function (extracted for reuse in polling)
+  // Load tasks: try backend DB first (fast, supports filtering), chain as fallback
   const loadTasks = useCallback(async (isRefresh = false) => {
     if (isRefresh) setRefreshing(true)
     try {
-      const converted = await fetchAllTasksWithPdas()
-      if (!cancelledRef.current) {
-        setTasks(converted)
-        setError(null)
+      // Try backend DB first
+      const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api/v1'
+      const dbRes = await fetch(`${API_URL}/tasks?limit=100`).then(r => r.json()).catch(() => null)
+      
+      if (dbRes?.success && dbRes.data?.length > 0) {
+        // DB has tasks — use them, also merge with chain data in background
+        const dbTasks: Task[] = dbRes.data.map((raw: any) => ({
+          id: raw.task_pda || raw.id,
+          title: raw.title,
+          description: raw.description,
+          reward: parseFloat(raw.reward) || 0,
+          status: raw.status === 'created' ? 'open' as const : raw.status,
+          deadline: raw.verification_deadline ? new Date(raw.verification_deadline).toISOString().slice(0, 10) : '',
+          category: raw.category || 'General',
+          skills: raw.required_skills || [],
+          createdAt: raw.created_at ? new Date(raw.created_at).toISOString().slice(0, 10) : '',
+          bids: 0,
+          bidRange: { min: 0, max: 0 },
+          publisher: raw.creator_wallet ? { address: raw.creator_wallet, reputation: 0, tasksCompleted: 0, tasksFailed: 0, joinedDays: 0 } : null,
+          paymentType: 'sol' as const,
+        }))
+        if (!cancelledRef.current) {
+          setTasks(dbTasks)
+          setError(null)
+        }
+        // Also fetch chain data in background to merge any tasks not yet synced
+        fetchAllTasksWithPdas().then(chainTasks => {
+          if (cancelledRef.current) return
+          // Merge: use chain tasks as base, DB tasks fill in any gaps
+          const merged = new Map<string, Task>()
+          for (const t of chainTasks) merged.set(t.id, t)
+          for (const t of dbTasks) {
+            if (!merged.has(t.id)) merged.set(t.id, t)
+          }
+          setTasks(Array.from(merged.values()))
+        }).catch(() => {/* chain fetch failed, DB data is fine */})
+      } else {
+        // DB empty or unavailable — fall back to chain
+        const converted = await fetchAllTasksWithPdas()
+        if (!cancelledRef.current) {
+          setTasks(converted)
+          setError(null)
+        }
       }
     } catch (err) {
       if (!cancelledRef.current) {
@@ -355,9 +395,9 @@ export default function TaskSquarePage() {
           <div className="flex items-center gap-2">
             <span className="text-xs text-gray-500 font-medium">Type:</span>
             <div className="flex gap-2">
-              {(['all', 'open', 'in_progress'] as TaskType[]).map((f) => (
+              {(['all', 'open', 'assigned', 'in_progress', 'submitted'] as TaskType[]).map((f) => (
                 <FilterPill key={f} active={typeFilter === f} onClick={() => setTypeFilter(f)}>
-                  {f === 'all' ? 'All' : f === 'open' ? 'Open' : 'In Progress'}
+                  {f === 'all' ? 'All' : f === 'open' ? 'Open' : f === 'assigned' ? 'Assigned' : f === 'in_progress' ? 'In Progress' : 'Submitted'}
                 </FilterPill>
               ))}
             </div>
@@ -450,13 +490,15 @@ async function fetchAllTasksWithPdas(): Promise<Task[]> {
     const conn = new Connection(RPC_ENDPOINT, 'confirmed')
     
     const accounts = await conn.getProgramAccounts(PROGRAM_ID, {
-      filters: [{ dataSize: 800 }]
+      filters: [{ dataSize: 1341 }]
     })
     
     const tasks: Task[] = []
     for (const { pubkey, account } of accounts) {
       try {
-        const raw = TASK_SCHEMA.decode(account.data)
+        // Skip 8-byte Anchor discriminator prefix
+        const data = account.data.slice(8)
+        const raw = TASK_SCHEMA.decode(data)
         if (!raw) continue
         // Borsh u64/i64 decode to BN objects — convert to string for chainTaskToTask
         const decoded: Record<string, any> = {}

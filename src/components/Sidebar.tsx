@@ -89,10 +89,7 @@ export default function Sidebar({ open, onClose }: SidebarProps) {
       >
         <div className="flex items-center justify-between p-4 border-b border-gray-800/70">
           <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-[#9945FF] to-[#14F195] flex items-center justify-center font-bold text-white text-sm">
-              U
-            </div>
-            <span className="text-white font-semibold">Uniclaw</span>
+            <img src="/logo-header.png" alt="Uniclaw" className="h-8" />
           </div>
           <button
             onClick={onClose}

@@ -297,8 +297,66 @@ export class TaskService {
       verification_time: row.verification_time,
       worker_reputation_at_assignment: row.worker_reputation_at_assignment,
       created_at: row.created_at,
-      updated_at: row.updated_at
+      updated_at: row.updated_at,
+      task_pda: row.task_pda,
+      tx_signature: row.tx_signature,
     }
+  }
+
+  // Get task by on-chain PDA address
+  async getByPda(pda: string): Promise<Task | null> {
+    const result = await pool.query(
+      'SELECT * FROM tasks WHERE task_pda = $1',
+      [pda]
+    )
+    if (result.rows.length === 0) return null
+    return this.mapTask(result.rows[0])
+  }
+
+  // Sync a task from chain to DB (called after successful on-chain tx)
+  async syncFromChain(data: {
+    title: string
+    description: string
+    required_skills: string[]
+    reward: string
+    verification_period: number
+    tx_signature: string
+    task_pda: string
+    creator_wallet: string
+    category?: string
+  }): Promise<Task> {
+    // Check if already synced (idempotent)
+    const existing = await this.getByPda(data.task_pda)
+    if (existing) return existing
+
+    const verificationDeadline = new Date(
+      Date.now() + data.verification_period * 1000
+    )
+
+    const result = await pool.query(
+      `INSERT INTO tasks (
+         creator_wallet, title, description, required_skills,
+         reward, verification_deadline, status, task_pda, tx_signature
+       ) VALUES ($1, $2, $3, $4, $5, $6, 'created', $7, $8)
+       ON CONFLICT (task_pda) DO NOTHING
+       RETURNING *`,
+      [
+        data.creator_wallet,
+        data.title,
+        data.description,
+        data.required_skills,
+        data.reward,
+        verificationDeadline,
+        data.task_pda,
+        data.tx_signature,
+      ]
+    )
+
+    if (result.rows.length === 0) {
+      // Already existed via ON CONFLICT
+      return (await this.getByPda(data.task_pda))!
+    }
+    return this.mapTask(result.rows[0])
   }
 }
 

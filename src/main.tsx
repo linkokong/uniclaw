@@ -2,7 +2,7 @@ import ReactDOM from 'react-dom/client'
 import { BrowserRouter } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { ConnectionProvider, WalletProvider } from '@solana/wallet-adapter-react'
-import { PhantomWalletAdapter, SolflareWalletAdapter } from '@solana/wallet-adapter-wallets'
+import { SolflareWalletAdapter } from '@solana/wallet-adapter-wallets'
 import { WalletModalProvider } from '@solana/wallet-adapter-react-ui'
 import type { BaseWalletAdapter } from '@solana/wallet-adapter-base'
 import { Connection, PublicKey, Transaction } from '@solana/web3.js'
@@ -17,8 +17,6 @@ const queryClient = new QueryClient()
 const endpoint = 'https://api.devnet.solana.com'
 
 // ─── Patch AnchorProvider.local() to work in browser ────────────────────────
-// Anchor SDK calls this internally as a fallback; override it to return
-// a read-only provider instead of throwing "not available on browser"
 const connection = new Connection(endpoint, 'confirmed')
 AnchorProvider.local = () => new AnchorProvider(
   connection,
@@ -30,13 +28,14 @@ AnchorProvider.local = () => new AnchorProvider(
   { commitment: 'confirmed' }
 )
 
-// Lazily instantiate adapters — Phantom may not be injected at module load time
-// so we defer until the WalletProvider first renders
+// Only include non-Standard adapters — Phantom registers itself as a
+// Standard Wallet automatically, so adding PhantomWalletAdapter causes
+// the "Phantom was registered as a Standard Wallet" console warning.
 let _wallets: BaseWalletAdapter[] | null = null
 function getWallets(): BaseWalletAdapter[] {
   if (_wallets) return _wallets
   const adapters: BaseWalletAdapter[] = []
-  for (const Adapter of [PhantomWalletAdapter, SolflareWalletAdapter]) {
+  for (const Adapter of [SolflareWalletAdapter]) {
     try {
       adapters.push(new Adapter())
     } catch {
@@ -44,22 +43,19 @@ function getWallets(): BaseWalletAdapter[] {
     }
   }
   _wallets = adapters
-  console.debug('[Wallet] Available adapters:', adapters.map(a => a.name))
   return adapters
 }
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <QueryClientProvider client={queryClient}>
     <ConnectionProvider endpoint={endpoint}>
-      {/* autoConnect: when user selects a wallet in the modal, auto-connect fires immediately */}
-      <WalletProvider wallets={getWallets()} autoConnect onError={(error, adapter) => {
-        // Suppress WalletNotReadyError — thrown when wallet extension not installed
+      <WalletProvider wallets={getWallets()} autoConnect onError={(error) => {
         if (error.name !== 'WalletNotReadyError') {
-          console.error('[Wallet]', error, adapter)
+          console.error('[Wallet]', error)
         }
       }}>
         <WalletModalProvider>
-          <BrowserRouter>
+          <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
             <App />
           </BrowserRouter>
         </WalletModalProvider>

@@ -6,8 +6,9 @@
 import { useState, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useWallet } from '@solana/wallet-adapter-react'
-import { createTaskOnChain, createTaskTokenOnChain } from '../utils/anchor'
+import { createTaskOnChain, createTaskTokenOnChain, deriveTaskPda } from '../utils/anchor'
 import { TOKENS } from '../utils/tokens'
+import { BASE_URL } from '../api/client'
 
 // ─── Payment Type ─────────────────────────────────────────────────────────
 type PaymentType = 'SOL' | 'UNICLAW' | 'USDGO'
@@ -468,30 +469,51 @@ export function TaskCreatePage() {
 
     try {
       const walletAdapter = wallet as never
+      // Append a short nonce to title for unique PDA derivation (same user + same title won't collide)
+      const nonce = Date.now().toString(36).slice(-4)
+      const onChainTitle = `${form.title.trim()}#${nonce}`.slice(0, 100)
+      let txSignature: string
       if (form.paymentType === 'UNICLAW') {
-        // UNICLAW token task
         const rewardRaw = Math.round(parseFloat(form.reward) * 10 ** TOKENS.UNICLAW.decimals)
-        await createTaskTokenOnChain(
+        txSignature = await createTaskTokenOnChain(
           walletAdapter,
-          form.title.trim(),
+          onChainTitle,
           form.description.trim(),
           form.skills,
           rewardRaw,
-          604800, // 7 days verification period
+          604800,
         )
       } else {
-        // SOL or USDGO task (both use SOL lamports on-chain for now)
         const rewardLamports = Math.round(parseFloat(form.reward) * 1e9)
-        await createTaskOnChain(
+        txSignature = await createTaskOnChain(
           walletAdapter,
-          form.title.trim(),
+          onChainTitle,
           form.description.trim(),
           form.skills,
           rewardLamports,
           604800,
         )
       }
-      navigate('/tasks')
+
+      // Sync to backend DB (fire-and-forget, don't block navigation)
+      const taskPda = deriveTaskPda(wallet.publicKey!.toBase58(), onChainTitle)
+      fetch(`${BASE_URL}/tasks/sync`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title: form.title.trim(),
+          description: form.description.trim(),
+          required_skills: form.skills,
+          reward: form.reward,
+          verification_period: 604800,
+          tx_signature: txSignature,
+          task_pda: taskPda.toBase58(),
+          creator_wallet: wallet.publicKey!.toBase58(),
+          category: form.category || 'General',
+        }),
+      }).catch(err => console.warn('[TaskCreate] DB sync failed (non-critical):', err))
+
+      navigate('/')
     } catch (err) {
       setServerError(err instanceof Error ? err.message : 'Failed to create task. Please try again.')
       setSubmitting(false)

@@ -30,15 +30,8 @@ export default function Header({ onToggleSidebar, isMobile }: HeaderProps) {
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
           </svg>
         </button>
-        <Link to="/" className="flex items-center gap-3 group">
-          <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-solana-purple to-solana-gradient flex items-center justify-center font-bold text-white group-hover:shadow-glow transition-shadow">
-            U
-          </div>
-          {!isMobile && (
-            <span className="text-lg font-semibold text-text-primary">
-              Uniclaw
-            </span>
-          )}
+        <Link to="/" className="flex items-center gap-2 group">
+          <img src="/logo-header.png" alt="Uniclaw" className="h-8 group-hover:opacity-90 transition-opacity" />
         </Link>
       </div>
 

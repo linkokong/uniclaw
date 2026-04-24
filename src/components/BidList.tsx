@@ -5,7 +5,7 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useWallet } from '@solana/wallet-adapter-react'
-import { PublicKey } from '@solana/web3.js'
+import { PublicKey, Connection } from '@solana/web3.js'
 import { getTaskBids } from '../api/task'
 import { getUserByWallet } from '../api/user'
 import { acceptBid, rejectBid } from '../api/bid'
@@ -19,6 +19,88 @@ import {
 import type { RawBid } from '../types/api'
 import { BidStatus } from '../types/api'
 import { SkillTag } from './SkillTags'
+
+const PROGRAM_ID = new PublicKey('EzZB9K4JVeFDczc4tRy78uR6JAiQazHhsY7MvY3B2Q2C')
+const RPC_ENDPOINT = 'https://api.devnet.solana.com'
+
+// Check if a string looks like a Solana address (base58, 32-44 chars)
+function isSolanaAddress(s: string): boolean {
+  return /^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(s)
+}
+
+// Fetch bids from chain for a given task PDA
+async function fetchBidsFromChain(taskPda: string): Promise<RawBid[]> {
+  try {
+    const { struct, u8, u64, publicKey, str } = await import('@coral-xyz/borsh')
+    const conn = new Connection(RPC_ENDPOINT, 'confirmed')
+
+    // Bid accounts have a specific layout — filter by program and look for task reference
+    const accounts = await conn.getProgramAccounts(PROGRAM_ID, {
+      filters: [
+        { dataSize: 200 }, // Approximate bid account size
+      ],
+    })
+
+    // Also try other common sizes
+    const accounts2 = await conn.getProgramAccounts(PROGRAM_ID, {
+      filters: [
+        { dataSize: 250 },
+      ],
+    }).catch(() => [])
+
+    const allAccounts = [...accounts, ...accounts2]
+
+    const BID_SCHEMA = struct([
+      publicKey('bidder'),
+      publicKey('task'),
+      str('proposal'),
+      u64('deposit'),
+      u8('status'),
+      u8('bump'),
+    ])
+
+    const bids: RawBid[] = []
+    for (const { pubkey, account } of allAccounts) {
+      try {
+        const raw = BID_SCHEMA.decode(account.data)
+        if (!raw || !raw.task) continue
+        const taskAddr = raw.task.toBase58 ? raw.task.toBase58() : String(raw.task)
+        if (taskAddr !== taskPda) continue
+
+        const bidderAddr = raw.bidder.toBase58 ? raw.bidder.toBase58() : String(raw.bidder)
+        const depositBN = raw.deposit && typeof raw.deposit === 'object' && (raw.deposit as any)._bn !== undefined
+          ? (raw.deposit as any).toString()
+          : String(raw.deposit ?? 0)
+        const depositSol = (Number(BigInt(depositBN)) / 1e9).toFixed(4)
+
+        const statusMap: Record<number, BidStatus> = {
+          0: BidStatus.Pending,
+          1: BidStatus.Accepted,
+          2: BidStatus.Rejected,
+          3: BidStatus.Withdrawn,
+        }
+
+        bids.push({
+          id: pubkey.toBase58(),
+          task_id: taskPda,
+          bidder_wallet: bidderAddr,
+          amount: depositSol,
+          proposal: raw.proposal || '',
+          estimated_duration: '1 week',
+          status: statusMap[raw.status] ?? BidStatus.Pending,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        })
+      } catch {
+        // Skip accounts that don't match bid schema
+      }
+    }
+    return bids
+  } catch (err) {
+    console.error('[BidList] fetchBidsFromChain error:', err)
+    return []
+  }
+}
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -390,20 +472,25 @@ export default function BidList({ taskId, taskPda, taskTitle, creatorWallet, ini
   const [error, setError] = useState<string | null>(null)
   const [sortKey, setSortKey] = useState<SortKey>('newest')
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc')
-  const [actionMode, setActionMode] = useState<'api' | 'onchain'>('api')
+  const [actionMode, setActionMode] = useState<'api' | 'onchain'>(isSolanaAddress(taskId) ? 'onchain' : 'api')
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const prevBidCount = useRef<number | null>(null)
 
-  // ── Load bids from API ──────────────────────────────────────────────────
+  // ── Load bids from API or chain ──────────────────────────────────────────
   const loadBids = useCallback(async (silent = false) => {
     if (!silent) setLoading(true)
     setError(null)
     try {
-      const data = await getTaskBids(taskId)
+      let data: RawBid[]
+      // If taskId looks like a Solana address (PDA), load from chain
+      if (isSolanaAddress(taskId) && taskId.length >= 32) {
+        data = await fetchBidsFromChain(taskId)
+      } else {
+        data = await getTaskBids(taskId)
+      }
       setBids(data)
-      // Detect new bid → could trigger notification
       if (prevBidCount.current !== null && data.length > prevBidCount.current) {
-        // New bid arrived — could flash or notify parent
+        // New bid arrived
       }
       prevBidCount.current = data.length
     } catch (err) {

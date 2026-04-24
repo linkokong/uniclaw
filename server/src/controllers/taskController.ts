@@ -104,10 +104,22 @@ export const taskController = {
     })
   }),
 
-  // GET /tasks/:id - 获取单个任务
+  // GET /tasks/:id - 获取单个任务（支持 UUID 和链上 PDA 地址）
   getById: asyncHandler(async (req: AuthRequest, res: Response) => {
-    const task = await taskService.getById(String(req.params.id))
-    res.json({ success: true, data: task })
+    const id = String(req.params.id || req.params.taskId)
+    // Try UUID first, then PDA
+    try {
+      const task = await taskService.getById(id)
+      res.json({ success: true, data: task })
+    } catch {
+      // Try by PDA address
+      const task = await taskService.getByPda(id)
+      if (task) {
+        res.json({ success: true, data: task })
+      } else {
+        res.status(404).json({ success: false, error: { code: 'NOT_FOUND', message: 'Task not found' } })
+      }
+    }
   }),
 
   // POST /tasks/:id/start - 开始任务
@@ -143,7 +155,38 @@ export const taskController = {
   getBids: asyncHandler(async (req: AuthRequest, res: Response) => {
     const page = Math.max(1, (req.query.page as unknown as number) || 1)
     const limit = Math.min(100, (req.query.limit as unknown as number) || 20)
-    const { bids, total } = await bidService.listByTask(String(req.params.taskId), page, limit)
+    const taskId = String(req.params.taskId || req.params.id)
+    const { bids, total } = await bidService.listByTask(taskId, page, limit)
     res.json({ success: true, data: bids, meta: { page, limit, total } })
+  }),
+
+  // POST /tasks/sync - 链上交易成功后同步到 DB
+  syncFromChain: asyncHandler(async (req: AuthRequest, res: Response) => {
+    const { title, description, required_skills, reward, verification_period,
+            tx_signature, task_pda, creator_wallet, category } = req.body as {
+      title: string
+      description: string
+      required_skills?: string[]
+      reward: string
+      verification_period?: number
+      tx_signature: string
+      task_pda: string
+      creator_wallet: string
+      category?: string
+    }
+
+    const task = await taskService.syncFromChain({
+      title,
+      description,
+      required_skills: required_skills ?? [],
+      reward,
+      verification_period: verification_period ?? 604800,
+      tx_signature,
+      task_pda,
+      creator_wallet,
+      category,
+    })
+
+    res.status(201).json({ success: true, data: task })
   }),
 }

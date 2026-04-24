@@ -1,214 +1,686 @@
 {
   "version": "0.1.0",
   "name": "task_contract",
+  "address": "EzZB9K4JVeFDczc4tRy78uR6JAiQazHhsY7MvY3B2Q2C",
   "instructions": [
     {
       "name": "initializePlatform",
+      "discriminator": [
+        119,
+        201,
+        101,
+        45,
+        75,
+        122,
+        89,
+        3
+      ],
       "accounts": [
-        { "name": "authority", "isMut": true, "isSigner": true },
-        { "name": "treasury", "isMut": true, "isSigner": false },
-        { "name": "systemProgram", "isMut": false, "isSigner": false }
+        {
+          "name": "authority",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "treasury",
+          "writable": true
+        },
+        {
+          "name": "systemProgram"
+        }
       ],
       "args": []
     },
     {
       "name": "initializeWorkerProfile",
+      "discriminator": [
+        205,
+        199,
+        158,
+        170,
+        233,
+        142,
+        7,
+        210
+      ],
       "accounts": [
-        { "name": "owner", "isMut": true, "isSigner": true },
-        { "name": "workerProfile", "isMut": true, "isSigner": false },
-        { "name": "systemProgram", "isMut": false, "isSigner": false }
+        {
+          "name": "owner",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "workerProfile",
+          "writable": true
+        },
+        {
+          "name": "systemProgram"
+        }
       ],
       "args": []
     },
     {
       "name": "createTask",
+      "discriminator": [
+        194,
+        80,
+        6,
+        180,
+        232,
+        127,
+        48,
+        171
+      ],
       "accounts": [
-        { "name": "creator", "isMut": true, "isSigner": true },
-        { "name": "task", "isMut": true, "isSigner": false },
-        { "name": "escrow", "isMut": true, "isSigner": false },
-        { "name": "clock", "isMut": false, "isSigner": false },
-        { "name": "systemProgram", "isMut": false, "isSigner": false }
+        {
+          "name": "creator",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "task",
+          "writable": true
+        },
+        {
+          "name": "escrow",
+          "writable": true
+        },
+        {
+          "name": "clock"
+        },
+        {
+          "name": "systemProgram"
+        }
       ],
       "args": [
-        { "name": "title", "type": "string" },
-        { "name": "description", "type": "string" },
-        { "name": "requiredSkills", "type": { "vec": "string" } },
-        { "name": "reward", "type": "u64" },
-        { "name": "verificationPeriod", "type": "i64" }
+        {
+          "name": "title",
+          "type": "string"
+        },
+        {
+          "name": "description",
+          "type": "string"
+        },
+        {
+          "name": "requiredSkills",
+          "type": {
+            "vec": "string"
+          }
+        },
+        {
+          "name": "reward",
+          "type": "u64"
+        },
+        {
+          "name": "verificationPeriod",
+          "type": "i64"
+        }
       ]
     },
     {
       "name": "createTaskToken",
+      "discriminator": [
+        181,
+        103,
+        2,
+        248,
+        176,
+        30,
+        193,
+        66
+      ],
       "accounts": [
-        { "name": "creator", "isMut": true, "isSigner": true },
-        { "name": "task", "isMut": true, "isSigner": false },
-        { "name": "tokenEscrow", "isMut": true, "isSigner": false },
-        { "name": "creatorTokenAccount", "isMut": true, "isSigner": false },
-        { "name": "escrowTokenAccount", "isMut": true, "isSigner": false },
-        { "name": "tokenMint", "isMut": false, "isSigner": false },
-        { "name": "tokenProgram", "isMut": false, "isSigner": false },
-        { "name": "clock", "isMut": false, "isSigner": false },
-        { "name": "systemProgram", "isMut": false, "isSigner": false },
-        { "name": "rent", "isMut": false, "isSigner": false }
+        {
+          "name": "creator",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "task",
+          "writable": true
+        },
+        {
+          "name": "tokenEscrow",
+          "writable": true
+        },
+        {
+          "name": "creatorTokenAccount",
+          "writable": true
+        },
+        {
+          "name": "escrowTokenAccount",
+          "writable": true
+        },
+        {
+          "name": "tokenMint"
+        },
+        {
+          "name": "tokenProgram"
+        },
+        {
+          "name": "clock"
+        },
+        {
+          "name": "systemProgram"
+        },
+        {
+          "name": "rent"
+        }
       ],
       "args": [
-        { "name": "title", "type": "string" },
-        { "name": "description", "type": "string" },
-        { "name": "requiredSkills", "type": { "vec": "string" } },
-        { "name": "reward", "type": "u64" },
-        { "name": "verificationPeriod", "type": "i64" },
-        { "name": "tokenMint", "type": "publicKey" }
+        {
+          "name": "title",
+          "type": "string"
+        },
+        {
+          "name": "description",
+          "type": "string"
+        },
+        {
+          "name": "requiredSkills",
+          "type": {
+            "vec": "string"
+          }
+        },
+        {
+          "name": "reward",
+          "type": "u64"
+        },
+        {
+          "name": "verificationPeriod",
+          "type": "i64"
+        },
+        {
+          "name": "tokenMint",
+          "type": "pubkey"
+        }
       ]
     },
     {
       "name": "assignTask",
+      "discriminator": [
+        158,
+        142,
+        217,
+        16,
+        175,
+        209,
+        92,
+        237
+      ],
       "accounts": [
-        { "name": "creator", "isMut": false, "isSigner": true },
-        { "name": "worker", "isMut": false, "isSigner": true },
-        { "name": "workerProfile", "isMut": false, "isSigner": false },
-        { "name": "task", "isMut": true, "isSigner": false }
+        {
+          "name": "creator",
+          "signer": true
+        },
+        {
+          "name": "worker",
+          "signer": true
+        },
+        {
+          "name": "workerProfile"
+        },
+        {
+          "name": "task",
+          "writable": true
+        }
       ],
       "args": []
     },
     {
       "name": "submitBid",
+      "discriminator": [
+        19,
+        164,
+        237,
+        254,
+        64,
+        139,
+        237,
+        93
+      ],
       "accounts": [
-        { "name": "bidder", "isMut": true, "isSigner": true },
-        { "name": "bid", "isMut": true, "isSigner": false },
-        { "name": "bidEscrow", "isMut": true, "isSigner": false },
-        { "name": "task", "isMut": true, "isSigner": false },
-        { "name": "systemProgram", "isMut": false, "isSigner": false }
+        {
+          "name": "bidder",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "bid",
+          "writable": true
+        },
+        {
+          "name": "bidEscrow",
+          "writable": true
+        },
+        {
+          "name": "task",
+          "writable": true
+        },
+        {
+          "name": "systemProgram"
+        }
       ],
       "args": [
-        { "name": "proposal", "type": "string" },
-        { "name": "deposit", "type": "u64" }
+        {
+          "name": "proposal",
+          "type": "string"
+        },
+        {
+          "name": "deposit",
+          "type": "u64"
+        }
       ]
     },
     {
       "name": "withdrawBid",
+      "discriminator": [
+        110,
+        53,
+        157,
+        195,
+        147,
+        100,
+        110,
+        73
+      ],
       "accounts": [
-        { "name": "bidder", "isMut": true, "isSigner": true },
-        { "name": "bid", "isMut": true, "isSigner": false },
-        { "name": "task", "isMut": true, "isSigner": false },
-        { "name": "bidEscrow", "isMut": true, "isSigner": false }
+        {
+          "name": "bidder",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "bid",
+          "writable": true
+        },
+        {
+          "name": "task",
+          "writable": true
+        },
+        {
+          "name": "bidEscrow",
+          "writable": true
+        }
       ],
       "args": []
     },
     {
       "name": "acceptBid",
+      "discriminator": [
+        196,
+        191,
+        1,
+        229,
+        144,
+        172,
+        122,
+        227
+      ],
       "accounts": [
-        { "name": "creator", "isMut": true, "isSigner": true },
-        { "name": "bid", "isMut": true, "isSigner": false },
-        { "name": "task", "isMut": true, "isSigner": false },
-        { "name": "treasury", "isMut": true, "isSigner": false },
-        { "name": "workerProfile", "isMut": false, "isSigner": false },
-        { "name": "bidEscrow", "isMut": true, "isSigner": false }
+        {
+          "name": "creator",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "bid",
+          "writable": true
+        },
+        {
+          "name": "task",
+          "writable": true
+        },
+        {
+          "name": "treasury",
+          "writable": true
+        },
+        {
+          "name": "workerProfile"
+        },
+        {
+          "name": "bidEscrow",
+          "writable": true
+        }
       ],
       "args": []
     },
     {
       "name": "rejectBid",
+      "discriminator": [
+        16,
+        180,
+        239,
+        231,
+        62,
+        80,
+        45,
+        40
+      ],
       "accounts": [
-        { "name": "creator", "isMut": true, "isSigner": true },
-        { "name": "bid", "isMut": true, "isSigner": false },
-        { "name": "bidder", "isMut": true, "isSigner": false },
-        { "name": "task", "isMut": true, "isSigner": false },
-        { "name": "bidEscrow", "isMut": true, "isSigner": false }
+        {
+          "name": "creator",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "bid",
+          "writable": true
+        },
+        {
+          "name": "bidder",
+          "writable": true
+        },
+        {
+          "name": "task",
+          "writable": true
+        },
+        {
+          "name": "bidEscrow",
+          "writable": true
+        }
       ],
       "args": []
     },
     {
       "name": "startTask",
+      "discriminator": [
+        188,
+        33,
+        243,
+        39,
+        149,
+        232,
+        14,
+        168
+      ],
       "accounts": [
-        { "name": "worker", "isMut": false, "isSigner": true },
-        { "name": "task", "isMut": true, "isSigner": false }
+        {
+          "name": "worker",
+          "signer": true
+        },
+        {
+          "name": "task",
+          "writable": true
+        }
       ],
       "args": []
     },
     {
       "name": "submitTask",
+      "discriminator": [
+        148,
+        183,
+        26,
+        116,
+        107,
+        213,
+        118,
+        213
+      ],
       "accounts": [
-        { "name": "worker", "isMut": false, "isSigner": true },
-        { "name": "task", "isMut": true, "isSigner": false }
+        {
+          "name": "worker",
+          "signer": true
+        },
+        {
+          "name": "task",
+          "writable": true
+        }
       ],
       "args": []
     },
     {
       "name": "verifyTask",
+      "discriminator": [
+        175,
+        152,
+        172,
+        204,
+        64,
+        126,
+        201,
+        206
+      ],
       "accounts": [
-        { "name": "creator", "isMut": false, "isSigner": true },
-        { "name": "worker", "isMut": false, "isSigner": false },
-        { "name": "task", "isMut": true, "isSigner": false },
-        { "name": "escrow", "isMut": true, "isSigner": false },
-        { "name": "treasury", "isMut": true, "isSigner": false },
-        { "name": "workerProfile", "isMut": true, "isSigner": false }
+        {
+          "name": "creator",
+          "signer": true
+        },
+        {
+          "name": "worker"
+        },
+        {
+          "name": "task",
+          "writable": true
+        },
+        {
+          "name": "escrow",
+          "writable": true
+        },
+        {
+          "name": "treasury",
+          "writable": true
+        },
+        {
+          "name": "workerProfile",
+          "writable": true
+        }
       ],
       "args": [
-        { "name": "approved", "type": "bool" }
+        {
+          "name": "approved",
+          "type": "bool"
+        }
       ]
     },
     {
       "name": "verifyTaskToken",
+      "discriminator": [
+        7,
+        178,
+        121,
+        29,
+        46,
+        32,
+        28,
+        118
+      ],
       "accounts": [
-        { "name": "creator", "isMut": false, "isSigner": true },
-        { "name": "worker", "isMut": false, "isSigner": false },
-        { "name": "task", "isMut": true, "isSigner": false },
-        { "name": "tokenEscrow", "isMut": false, "isSigner": false },
-        { "name": "escrowTokenAccount", "isMut": true, "isSigner": false },
-        { "name": "workerTokenAccount", "isMut": true, "isSigner": false },
-        { "name": "treasuryTokenAccount", "isMut": true, "isSigner": false },
-        { "name": "treasury", "isMut": true, "isSigner": false },
-        { "name": "workerProfile", "isMut": true, "isSigner": false },
-        { "name": "tokenProgram", "isMut": false, "isSigner": false }
+        {
+          "name": "creator",
+          "signer": true
+        },
+        {
+          "name": "worker"
+        },
+        {
+          "name": "task",
+          "writable": true
+        },
+        {
+          "name": "tokenEscrow"
+        },
+        {
+          "name": "escrowTokenAccount",
+          "writable": true
+        },
+        {
+          "name": "workerTokenAccount",
+          "writable": true
+        },
+        {
+          "name": "treasuryTokenAccount",
+          "writable": true
+        },
+        {
+          "name": "treasury",
+          "writable": true
+        },
+        {
+          "name": "workerProfile",
+          "writable": true
+        },
+        {
+          "name": "tokenProgram"
+        }
       ],
       "args": [
-        { "name": "approved", "type": "bool" }
+        {
+          "name": "approved",
+          "type": "bool"
+        }
       ]
     },
     {
       "name": "cancelTaskToken",
+      "discriminator": [
+        234,
+        92,
+        149,
+        223,
+        38,
+        45,
+        13,
+        205
+      ],
       "accounts": [
-        { "name": "creator", "isMut": false, "isSigner": true },
-        { "name": "task", "isMut": true, "isSigner": false },
-        { "name": "tokenEscrow", "isMut": false, "isSigner": false },
-        { "name": "escrowTokenAccount", "isMut": true, "isSigner": false },
-        { "name": "creatorTokenAccount", "isMut": true, "isSigner": false },
-        { "name": "tokenProgram", "isMut": false, "isSigner": false }
+        {
+          "name": "creator",
+          "signer": true
+        },
+        {
+          "name": "task",
+          "writable": true
+        },
+        {
+          "name": "tokenEscrow"
+        },
+        {
+          "name": "escrowTokenAccount",
+          "writable": true
+        },
+        {
+          "name": "creatorTokenAccount",
+          "writable": true
+        },
+        {
+          "name": "tokenProgram"
+        }
       ],
       "args": []
     },
     {
       "name": "disputeTaskToken",
+      "discriminator": [
+        141,
+        84,
+        116,
+        220,
+        131,
+        72,
+        16,
+        165
+      ],
       "accounts": [
-        { "name": "worker", "isMut": false, "isSigner": true },
-        { "name": "task", "isMut": true, "isSigner": false },
-        { "name": "tokenEscrow", "isMut": false, "isSigner": false },
-        { "name": "escrowTokenAccount", "isMut": true, "isSigner": false },
-        { "name": "workerTokenAccount", "isMut": true, "isSigner": false },
-        { "name": "treasuryTokenAccount", "isMut": true, "isSigner": false },
-        { "name": "treasury", "isMut": true, "isSigner": false },
-        { "name": "workerProfile", "isMut": true, "isSigner": false },
-        { "name": "tokenProgram", "isMut": false, "isSigner": false }
+        {
+          "name": "worker",
+          "signer": true
+        },
+        {
+          "name": "task",
+          "writable": true
+        },
+        {
+          "name": "tokenEscrow"
+        },
+        {
+          "name": "escrowTokenAccount",
+          "writable": true
+        },
+        {
+          "name": "workerTokenAccount",
+          "writable": true
+        },
+        {
+          "name": "treasuryTokenAccount",
+          "writable": true
+        },
+        {
+          "name": "treasury",
+          "writable": true
+        },
+        {
+          "name": "workerProfile",
+          "writable": true
+        },
+        {
+          "name": "tokenProgram"
+        }
       ],
       "args": []
     },
     {
       "name": "cancelTask",
+      "discriminator": [
+        69,
+        228,
+        134,
+        187,
+        134,
+        105,
+        238,
+        48
+      ],
       "accounts": [
-        { "name": "creator", "isMut": false, "isSigner": true },
-        { "name": "task", "isMut": true, "isSigner": false },
-        { "name": "escrow", "isMut": true, "isSigner": false }
+        {
+          "name": "creator",
+          "signer": true
+        },
+        {
+          "name": "task",
+          "writable": true
+        },
+        {
+          "name": "escrow",
+          "writable": true
+        }
       ],
       "args": []
     },
     {
       "name": "disputeTask",
+      "discriminator": [
+        140,
+        98,
+        191,
+        168,
+        154,
+        118,
+        50,
+        98
+      ],
       "accounts": [
-        { "name": "worker", "isMut": false, "isSigner": true },
-        { "name": "task", "isMut": true, "isSigner": false },
-        { "name": "escrow", "isMut": true, "isSigner": false },
-        { "name": "workerProfile", "isMut": true, "isSigner": false },
-        { "name": "treasury", "isMut": true, "isSigner": false }
+        {
+          "name": "worker",
+          "signer": true
+        },
+        {
+          "name": "task",
+          "writable": true
+        },
+        {
+          "name": "escrow",
+          "writable": true
+        },
+        {
+          "name": "workerProfile",
+          "writable": true
+        },
+        {
+          "name": "treasury",
+          "writable": true
+        }
       ],
       "args": []
     }
@@ -216,25 +688,159 @@
   "accounts": [
     {
       "name": "task",
+      "discriminator": [
+        79,
+        34,
+        229,
+        55,
+        88,
+        90,
+        55,
+        84
+      ]
+    },
+    {
+      "name": "taskEscrow",
+      "discriminator": [
+        209,
+        72,
+        197,
+        54,
+        17,
+        55,
+        3,
+        187
+      ]
+    },
+    {
+      "name": "tokenEscrow",
+      "discriminator": [
+        186,
+        189,
+        94,
+        9,
+        54,
+        146,
+        36,
+        165
+      ]
+    },
+    {
+      "name": "platformTreasury",
+      "discriminator": [
+        35,
+        229,
+        15,
+        221,
+        215,
+        174,
+        167,
+        92
+      ]
+    },
+    {
+      "name": "agentProfile",
+      "discriminator": [
+        60,
+        227,
+        42,
+        24,
+        0,
+        87,
+        86,
+        205
+      ]
+    },
+    {
+      "name": "bid",
+      "discriminator": [
+        143,
+        246,
+        48,
+        245,
+        42,
+        145,
+        180,
+        88
+      ]
+    }
+  ],
+  "types": [
+    {
+      "name": "task",
       "type": {
         "kind": "struct",
         "fields": [
-          { "name": "creator", "type": "publicKey" },
-          { "name": "worker", "type": "publicKey" },
-          { "name": "title", "type": "string" },
-          { "name": "description", "type": "string" },
-          { "name": "requiredSkills", "type": { "vec": "string" } },
-          { "name": "status", "type": "u8" },
-          { "name": "reward", "type": "u64" },
-          { "name": "paymentType", "type": "u8" },
-          { "name": "tokenMint", "type": "publicKey" },
-          { "name": "verificationDeadline", "type": "i64" },
-          { "name": "submissionTime", "type": { "option": "i64" } },
-          { "name": "verificationTime", "type": { "option": "i64" } },
-          { "name": "bump", "type": "u8" },
-          { "name": "createdAt", "type": "i64" },
-          { "name": "workerReputationAtAssignment", "type": "u32" },
-          { "name": "acceptedBidDeposit", "type": "u64" }
+          {
+            "name": "creator",
+            "type": "pubkey"
+          },
+          {
+            "name": "worker",
+            "type": "pubkey"
+          },
+          {
+            "name": "title",
+            "type": "string"
+          },
+          {
+            "name": "description",
+            "type": "string"
+          },
+          {
+            "name": "requiredSkills",
+            "type": {
+              "vec": "string"
+            }
+          },
+          {
+            "name": "status",
+            "type": "u8"
+          },
+          {
+            "name": "reward",
+            "type": "u64"
+          },
+          {
+            "name": "paymentType",
+            "type": "u8"
+          },
+          {
+            "name": "tokenMint",
+            "type": "pubkey"
+          },
+          {
+            "name": "verificationDeadline",
+            "type": "i64"
+          },
+          {
+            "name": "submissionTime",
+            "type": {
+              "option": "i64"
+            }
+          },
+          {
+            "name": "verificationTime",
+            "type": {
+              "option": "i64"
+            }
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          },
+          {
+            "name": "createdAt",
+            "type": "i64"
+          },
+          {
+            "name": "workerReputationAtAssignment",
+            "type": "u32"
+          },
+          {
+            "name": "acceptedBidDeposit",
+            "type": "u64"
+          }
         ]
       }
     },
@@ -243,9 +849,18 @@
       "type": {
         "kind": "struct",
         "fields": [
-          { "name": "task", "type": "publicKey" },
-          { "name": "balance", "type": "u64" },
-          { "name": "bump", "type": "u8" }
+          {
+            "name": "task",
+            "type": "pubkey"
+          },
+          {
+            "name": "balance",
+            "type": "u64"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
         ]
       }
     },
@@ -254,9 +869,18 @@
       "type": {
         "kind": "struct",
         "fields": [
-          { "name": "task", "type": "publicKey" },
-          { "name": "tokenMint", "type": "publicKey" },
-          { "name": "bump", "type": "u8" }
+          {
+            "name": "task",
+            "type": "pubkey"
+          },
+          {
+            "name": "tokenMint",
+            "type": "pubkey"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
         ]
       }
     },
@@ -265,10 +889,22 @@
       "type": {
         "kind": "struct",
         "fields": [
-          { "name": "authority", "type": "publicKey" },
-          { "name": "totalFeesCollected", "type": "u64" },
-          { "name": "feeBasisPoints", "type": "u16" },
-          { "name": "bump", "type": "u8" }
+          {
+            "name": "authority",
+            "type": "pubkey"
+          },
+          {
+            "name": "totalFeesCollected",
+            "type": "u64"
+          },
+          {
+            "name": "feeBasisPoints",
+            "type": "u16"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
         ]
       }
     },
@@ -277,14 +913,40 @@
       "type": {
         "kind": "struct",
         "fields": [
-          { "name": "owner", "type": "publicKey" },
-          { "name": "reputation", "type": "u32" },
-          { "name": "tasksCompleted", "type": "u64" },
-          { "name": "tasksFailed", "type": "u64" },
-          { "name": "tier", "type": "u8" },
-          { "name": "skills", "type": { "vec": "string" } },
-          { "name": "totalEarnings", "type": "u64" },
-          { "name": "bump", "type": "u8" }
+          {
+            "name": "owner",
+            "type": "pubkey"
+          },
+          {
+            "name": "reputation",
+            "type": "u32"
+          },
+          {
+            "name": "tasksCompleted",
+            "type": "u64"
+          },
+          {
+            "name": "tasksFailed",
+            "type": "u64"
+          },
+          {
+            "name": "tier",
+            "type": "u8"
+          },
+          {
+            "name": "skills",
+            "type": {
+              "vec": "string"
+            }
+          },
+          {
+            "name": "totalEarnings",
+            "type": "u64"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
         ]
       }
     },
@@ -293,29 +955,60 @@
       "type": {
         "kind": "struct",
         "fields": [
-          { "name": "task", "type": "publicKey" },
-          { "name": "bidder", "type": "publicKey" },
-          { "name": "proposal", "type": "string" },
-          { "name": "deposit", "type": "u64" },
-          { "name": "status", "type": "u8" },
-          { "name": "createdAt", "type": "i64" },
-          { "name": "bump", "type": "u8" }
+          {
+            "name": "task",
+            "type": "pubkey"
+          },
+          {
+            "name": "bidder",
+            "type": "pubkey"
+          },
+          {
+            "name": "proposal",
+            "type": "string"
+          },
+          {
+            "name": "deposit",
+            "type": "u64"
+          },
+          {
+            "name": "status",
+            "type": "u8"
+          },
+          {
+            "name": "createdAt",
+            "type": "i64"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
         ]
       }
-    }
-  ],
-  "types": [
+    },
     {
       "name": "TaskStatus",
       "type": {
         "kind": "enum",
         "variants": [
-          { "name": "Created" },
-          { "name": "Assigned" },
-          { "name": "InProgress" },
-          { "name": "Completed" },
-          { "name": "Verified" },
-          { "name": "Cancelled" }
+          {
+            "name": "Created"
+          },
+          {
+            "name": "Assigned"
+          },
+          {
+            "name": "InProgress"
+          },
+          {
+            "name": "Completed"
+          },
+          {
+            "name": "Verified"
+          },
+          {
+            "name": "Cancelled"
+          }
         ]
       }
     },
@@ -324,11 +1017,21 @@
       "type": {
         "kind": "enum",
         "variants": [
-          { "name": "Active" },
-          { "name": "Accepted" },
-          { "name": "Rejected" },
-          { "name": "Cancelled" },
-          { "name": "Withdrawn" }
+          {
+            "name": "Active"
+          },
+          {
+            "name": "Accepted"
+          },
+          {
+            "name": "Rejected"
+          },
+          {
+            "name": "Cancelled"
+          },
+          {
+            "name": "Withdrawn"
+          }
         ]
       }
     },
@@ -337,10 +1040,18 @@
       "type": {
         "kind": "enum",
         "variants": [
-          { "name": "Bronze" },
-          { "name": "Silver" },
-          { "name": "Gold" },
-          { "name": "Platinum" }
+          {
+            "name": "Bronze"
+          },
+          {
+            "name": "Silver"
+          },
+          {
+            "name": "Gold"
+          },
+          {
+            "name": "Platinum"
+          }
         ]
       }
     },
@@ -349,36 +1060,132 @@
       "type": {
         "kind": "enum",
         "variants": [
-          { "name": "Sol" },
-          { "name": "SplToken" }
+          {
+            "name": "Sol"
+          },
+          {
+            "name": "SplToken"
+          }
         ]
       }
     }
   ],
   "errors": [
-    { "code": 100, "name": "InvalidTaskState", "msg": "Task is not in the expected state" },
-    { "code": 101, "name": "TaskAlreadyAssigned", "msg": "Task is already assigned" },
-    { "code": 102, "name": "TaskAlreadyCompleted", "msg": "Task has already been completed" },
-    { "code": 103, "name": "NotTaskCreator", "msg": "Caller is not the task creator" },
-    { "code": 104, "name": "NotTaskWorker", "msg": "Caller is not the assigned worker" },
-    { "code": 105, "name": "DeadlineExceeded", "msg": "Task deadline has passed" },
-    { "code": 106, "name": "VerificationDeadlineExceeded", "msg": "Verification deadline has passed" },
-    { "code": 107, "name": "InsufficientEscrowFunds", "msg": "Insufficient reward funds in escrow" },
-    { "code": 108, "name": "InvalidReputation", "msg": "Invalid reputation score" },
-    { "code": 109, "name": "InsufficientTier", "msg": "Agent tier too low for this task" },
-    { "code": 110, "name": "MissingRequiredSkill", "msg": "Agent does not have required skills" },
-    { "code": 111, "name": "SelfAssignmentNotAllowed", "msg": "Creator cannot assign task to self" },
-    { "code": 112, "name": "ZeroReward", "msg": "Reward amount must be greater than zero" },
-    { "code": 113, "name": "TaskNotFound", "msg": "Task account not found" },
-    { "code": 114, "name": "EscrowNotFound", "msg": "Escrow account not found" },
-    { "code": 115, "name": "ArithmeticOverflow", "msg": "Arithmetic overflow occurred" },
-    { "code": 116, "name": "FeeCalculationError", "msg": "Fee calculation error" },
-    { "code": 117, "name": "TransferFailed", "msg": "Failed to transfer lamports" },
-    { "code": 118, "name": "AccountMismatch", "msg": "Account mismatch" },
-    { "code": 119, "name": "BidAlreadyExists", "msg": "Bid already exists for this task and worker" },
-    { "code": 120, "name": "BidNotFound", "msg": "Bid not found" },
-    { "code": 121, "name": "InsufficientBidDeposit", "msg": "Worker does not have enough funds for bid deposit" },
-    { "code": 122, "name": "BidDepositTooSmall", "msg": "Bid deposit too small" }
+    {
+      "code": 100,
+      "name": "InvalidTaskState",
+      "msg": "Task is not in the expected state"
+    },
+    {
+      "code": 101,
+      "name": "TaskAlreadyAssigned",
+      "msg": "Task is already assigned"
+    },
+    {
+      "code": 102,
+      "name": "TaskAlreadyCompleted",
+      "msg": "Task has already been completed"
+    },
+    {
+      "code": 103,
+      "name": "NotTaskCreator",
+      "msg": "Caller is not the task creator"
+    },
+    {
+      "code": 104,
+      "name": "NotTaskWorker",
+      "msg": "Caller is not the assigned worker"
+    },
+    {
+      "code": 105,
+      "name": "DeadlineExceeded",
+      "msg": "Task deadline has passed"
+    },
+    {
+      "code": 106,
+      "name": "VerificationDeadlineExceeded",
+      "msg": "Verification deadline has passed"
+    },
+    {
+      "code": 107,
+      "name": "InsufficientEscrowFunds",
+      "msg": "Insufficient reward funds in escrow"
+    },
+    {
+      "code": 108,
+      "name": "InvalidReputation",
+      "msg": "Invalid reputation score"
+    },
+    {
+      "code": 109,
+      "name": "InsufficientTier",
+      "msg": "Agent tier too low for this task"
+    },
+    {
+      "code": 110,
+      "name": "MissingRequiredSkill",
+      "msg": "Agent does not have required skills"
+    },
+    {
+      "code": 111,
+      "name": "SelfAssignmentNotAllowed",
+      "msg": "Creator cannot assign task to self"
+    },
+    {
+      "code": 112,
+      "name": "ZeroReward",
+      "msg": "Reward amount must be greater than zero"
+    },
+    {
+      "code": 113,
+      "name": "TaskNotFound",
+      "msg": "Task account not found"
+    },
+    {
+      "code": 114,
+      "name": "EscrowNotFound",
+      "msg": "Escrow account not found"
+    },
+    {
+      "code": 115,
+      "name": "ArithmeticOverflow",
+      "msg": "Arithmetic overflow occurred"
+    },
+    {
+      "code": 116,
+      "name": "FeeCalculationError",
+      "msg": "Fee calculation error"
+    },
+    {
+      "code": 117,
+      "name": "TransferFailed",
+      "msg": "Failed to transfer lamports"
+    },
+    {
+      "code": 118,
+      "name": "AccountMismatch",
+      "msg": "Account mismatch"
+    },
+    {
+      "code": 119,
+      "name": "BidAlreadyExists",
+      "msg": "Bid already exists for this task and worker"
+    },
+    {
+      "code": 120,
+      "name": "BidNotFound",
+      "msg": "Bid not found"
+    },
+    {
+      "code": 121,
+      "name": "InsufficientBidDeposit",
+      "msg": "Worker does not have enough funds for bid deposit"
+    },
+    {
+      "code": 122,
+      "name": "BidDepositTooSmall",
+      "msg": "Bid deposit too small"
+    }
   ],
   "metadata": {
     "address": "EzZB9K4JVeFDczc4tRy78uR6JAiQazHhsY7MvY3B2Q2C"

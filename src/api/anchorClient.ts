@@ -9,6 +9,7 @@
 import { Connection, PublicKey, Transaction } from '@solana/web3.js'
 import { Program, Idl, AnchorProvider, Provider, Wallet } from '@coral-xyz/anchor'
 import { getAssociatedTokenAddressSync, TOKEN_PROGRAM_ID } from '@solana/spl-token'
+import BN from 'bn.js'
 import idlRaw from './idl.json'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -76,14 +77,14 @@ export function getProgram(
 
   try {
     if (!wallet) {
-      return new Program({ idl, provider: getReadOnlyProvider() })
+      return new Program(idl, getReadOnlyProvider())
     }
     const anchorWallet = wallet as unknown as Wallet
     const provider = new AnchorProvider(connection, anchorWallet, {
       commitment: 'confirmed',
       preflightCommitment: 'confirmed',
     })
-    return new Program({ idl, provider })
+    return new Program(idl, provider)
   } finally {
     globalThis.structuredClone = _origClone
   }
@@ -110,7 +111,7 @@ export function classifyChainError(err: unknown): { userMsg: string; code: strin
     return { userMsg: '交易超时，请重试', code: 'TIMEOUT' }
   }
   if (msg.includes('0x1') || msg.includes('already')) {
-    return { userMsg: '操作已被执行，请刷新页面', code: 'ALREADY_EXECUTED' }
+    return { userMsg: '该任务标题已存在（链上 PDA 重复），请更换标题后重试', code: 'ALREADY_EXECUTED' }
   }
   return { userMsg: `交易失败: ${msg.slice(0, 80)}`, code: 'UNKNOWN' }
 }
@@ -278,15 +279,20 @@ export async function createTask(
   const escrow = findEscrowPda(task)
   try {
     return await program.methods
-      .createTask(title, description, requiredSkills, reward, verificationPeriod)
+      .createTask(title, description, requiredSkills, new BN(reward), new BN(verificationPeriod))
       .accounts({
         creator: wallet.publicKey,
         task,
         escrow,
+        clock: new PublicKey('SysvarC1ock11111111111111111111111111111111'),
         systemProgram: PublicKey.default,
       } as never)
       .rpc()
   } catch (err) {
+    // Log transaction simulation details if available
+    if (err && typeof err === 'object' && 'transactionLogs' in err) {
+      console.error('[anchorClient] createTask simulation logs:', (err as any).transactionLogs)
+    }
     const { userMsg, code } = classifyChainError(err)
     console.error(`[anchorClient] createTask error [${code}]:`, err)
     throw new Error(userMsg)
@@ -339,7 +345,7 @@ export async function createTaskToken(
 
   try {
     return await program.methods
-      .createTaskToken(title, description, requiredSkills, reward, verificationPeriod, tokenMint)
+      .createTaskToken(title, description, requiredSkills, new BN(reward), new BN(verificationPeriod), tokenMint)
       .accounts({
         creator: wallet.publicKey,
         task,
@@ -348,7 +354,7 @@ export async function createTaskToken(
         escrowTokenAccount,
         tokenMint,
         tokenProgram: new PublicKey('TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb'),
-        clock: PublicKey.default,
+        clock: new PublicKey('SysvarC1ock11111111111111111111111111111111'),
         systemProgram: PublicKey.default,
         rent: PublicKey.default,
       } as never)
@@ -414,7 +420,7 @@ export async function submitBid(
   )
   if (bidEscrowBump === undefined) throw new Error('BidEscrow PDA derivation failed')
   try {
-    return await program.methods.submitBid(proposal, deposit).accounts({
+    return await program.methods.submitBid(proposal, new BN(deposit)).accounts({
       bidder: wallet.publicKey,
       bid,
       bidEscrow,

@@ -39,6 +39,8 @@ export interface Task {
   submission_time?: Date
   verification_time?: Date
   worker_reputation_at_assignment: number
+  task_pda?: string
+  tx_signature?: string
   created_at: Date
   updated_at: Date
 }

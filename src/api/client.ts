@@ -7,7 +7,7 @@ import axios, { type AxiosInstance, type InternalAxiosRequestConfig } from 'axio
 import { parseApiError } from './transformers'
 import type { ApiResponse } from '../types/api'
 
-const BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api'
+const BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api/v1'
 const TIMEOUT = 10000
 const TOKEN_KEY = 'claw_wallet_token'
 

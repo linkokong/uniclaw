@@ -70,10 +70,10 @@ const SECTIONS = [
   {
     title: '关于 UNICLAW',
     items: [
-      { label: '白皮书', action: 'whitepaper' as const },
-      { label: '代币经济', action: 'tokenomics' as const },
-      { label: '技术架构', action: 'architecture' as const },
-      { label: '路线图', action: 'roadmap' as const },
+      { label: '白皮书', href: '/whitepaper' },
+      { label: '代币经济', href: '/whitepaper#tokenomics' },
+      { label: '技术架构', href: '/whitepaper#tech' },
+      { label: '路线图', href: '/whitepaper#roadmap' },
     ],
   },
   {
@@ -389,7 +389,7 @@ export default function Footer() {
               onClick={() => setWpOpen('whitepaper')}
               className="text-xs text-solana hover:underline cursor-pointer"
             >
-              📜 白皮书 v1.0.3 · Devnet Testing
+              📜 <a href="/whitepaper">白皮书 v1.0.3 · Devnet Testing</a>
             </button>
           </div>
         </div>

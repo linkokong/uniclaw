@@ -66,13 +66,14 @@ app.use(config.apiPrefix, apiLimiter)
 // API routes
 app.use(config.apiPrefix, routes)
 
-// Serve built frontend
+// Serve built frontend (production only)
 const distPath = path.resolve(__dirname, '../../dist')
-app.use(express.static(distPath))
-// Fallback to index.html for SPA routing
-app.get('*', (_, res) => {
-  res.sendFile(path.join(distPath, 'index.html'))
-})
+if (config.nodeEnv === 'production') {
+  app.use(express.static(distPath))
+  app.get('*', (_, res) => {
+    res.sendFile(path.join(distPath, 'index.html'))
+  })
+}
 
 // Error handling
 app.use(notFoundHandler)

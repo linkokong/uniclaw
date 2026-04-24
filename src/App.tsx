@@ -13,6 +13,7 @@ import SettingsPage from './pages/SettingsPage';
 import AgentMarketPage from './pages/AgentMarketPage';
 import WalletPage from './pages/WalletPage';
 import LeaderboardPage from './pages/LeaderboardPage';
+import WhitepaperPage from './pages/WhitepaperPage';
 import RegisterProfile from './pages/RegisterProfile';
 import LegalPage from './pages/LegalPage';
 
@@ -54,6 +55,7 @@ export default function App() {
           <Route path="/privacy" element={<LegalPage />} />
           <Route path="/terms" element={<LegalPage />} />
           <Route path="/about" element={<LegalPage />} />
+          <Route path="/whitepaper" element={<WhitepaperPage />} />
         </Routes>
       </Layout>
     </>

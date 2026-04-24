@@ -1,8 +1,7 @@
 import { Router } from 'express'
 import { body, param, query, validationResult } from 'express-validator'
 import { taskController } from '../controllers/taskController.js'
-import { bidController } from '../controllers/bidController.js'
-import { authenticateJWT } from '../middleware/auth.js'
+import { authenticateJWT, optionalAuth } from '../middleware/auth.js'
 
 const router = Router()
 
@@ -17,26 +16,12 @@ const handleValidationErrors = (req: any, res: any, next: any) => {
   next()
 }
 
-router.use(authenticateJWT)
+// ── Public endpoints (no auth required) ──────────────────────────────────
 
-// POST /tasks - 创建任务
-router.post('/',
-  [
-    body('title').trim().isLength({ min: 1, max: 255 }).withMessage('Title required, max 255 chars'),
-    body('description').trim().isLength({ min: 1, max: 5000 }).withMessage('Description required, max 5000 chars'),
-    body('required_skills').optional().isArray({ max: 20 }),
-    body('reward').optional().isDecimal({ decimal_digits: '0,9' }),
-    body('verification_period').optional().isInt({ min: 604800, max: 2592000 }),
-    body('signed_tx').optional().isString(),
-    handleValidationErrors
-  ],
-  taskController.create
-)
-
-// GET /tasks - 任务列表
+// GET /tasks - 任务列表（公开）
 router.get('/',
   [
-    query('status').optional().isIn(['open', 'in_progress', 'completed', 'cancelled']),
+    query('status').optional().isIn(['open', 'created', 'assigned', 'in_progress', 'completed', 'cancelled']),
     query('page').optional().isInt({ min: 1 }).toInt(),
     query('limit').optional().isInt({ min: 1, max: 100 }).toInt(),
     handleValidationErrors
@@ -44,47 +29,60 @@ router.get('/',
   taskController.list
 )
 
+// GET /tasks/:id - 获取单个任务（公开，支持 UUID 和 PDA 地址）
+router.get('/:id', taskController.getById)
+
+// GET /tasks/:taskId/bids - 获取任务投标（公开）
+router.get('/:taskId/bids', taskController.getBids)
+
+// ── Authenticated endpoints ──────────────────────────────────────────────
+
+// POST /tasks/sync - 链上交易成功后同步到 DB（需要钱包签名认证）
+router.post('/sync',
+  optionalAuth,
+  [
+    body('title').trim().isLength({ min: 1, max: 255 }),
+    body('description').trim().isLength({ min: 1, max: 5000 }),
+    body('reward').isString(),
+    body('tx_signature').isString(),
+    body('task_pda').isString(),
+    body('creator_wallet').isString(),
+    handleValidationErrors
+  ],
+  taskController.syncFromChain
+)
+
+router.use(authenticateJWT)
+
+// POST /tasks - 创建任务
+router.post('/',
+  [
+    body('title').trim().isLength({ min: 1, max: 255 }),
+    body('description').trim().isLength({ min: 1, max: 5000 }),
+    body('required_skills').optional().isArray({ max: 20 }),
+    body('reward').optional().isDecimal({ decimal_digits: '0,9' }),
+    body('verification_period').optional().isInt({ min: 604800, max: 2592000 }),
+    handleValidationErrors
+  ],
+  taskController.create
+)
+
 // GET /tasks/my - 我的任务
 router.get('/my', taskController.myTasks)
 
-// GET /tasks/:id - 获取单个任务
-router.get('/:id',
-  [param('id').isUUID().withMessage('Task ID must be a valid UUID'), handleValidationErrors],
-  taskController.getById
-)
+// POST /tasks/:id/start
+router.post('/:id/start', taskController.start)
 
-// POST /tasks/:id/start - 开始任务
-router.post('/:id/start',
-  [param('id').isUUID(), handleValidationErrors],
-  taskController.start
-)
+// POST /tasks/:id/submit
+router.post('/:id/submit', taskController.submit)
 
-// POST /tasks/:id/submit - 提交任务
-router.post('/:id/submit',
-  [param('id').isUUID(), handleValidationErrors],
-  taskController.submit
-)
-
-// POST /tasks/:id/verify - 验收（通过/拒绝）
+// POST /tasks/:id/verify
 router.post('/:id/verify',
-  [
-    param('id').isUUID(),
-    body('approved').isBoolean().withMessage('approved must be boolean'),
-    handleValidationErrors
-  ],
+  [body('approved').isBoolean(), handleValidationErrors],
   taskController.verify
 )
 
-// POST /tasks/:id/cancel - 取消任务
-router.post('/:id/cancel',
-  [param('id').isUUID(), handleValidationErrors],
-  taskController.cancel
-)
-
-// GET /tasks/:taskId/bids - 获取任务投标
-router.get('/:taskId/bids',
-  [param('taskId').isUUID(), handleValidationErrors],
-  taskController.getBids
-)
+// POST /tasks/:id/cancel
+router.post('/:id/cancel', taskController.cancel)
 
 export default router

@@ -260,36 +260,51 @@ export interface ChainTask {
   tokenMint?: string
 }
 
-/** Status enum mapping (matches contract) */
+/** Status enum mapping (matches contract lib.rs TaskStatus) */
 export const CHAIN_TASK_STATUS: Record<number, FrontendTaskStatus> = {
-  0: 'open',
-  1: 'in_progress',
-  2: 'submitted',
-  3: 'completed',
-  4: 'cancelled',
-  5: 'disputed',
+  0: 'open',        // Created
+  1: 'assigned',    // Assigned
+  2: 'in_progress', // InProgress
+  3: 'submitted',   // Submitted
+  4: 'completed',   // Completed / Verified
+  5: 'completed',   // Verified (alias)
+  6: 'cancelled',   // Cancelled
+  7: 'disputed',    // Disputed
 }
 
 /** Convert raw chain Task → frontend Task */
 export function chainTaskToTask(pda: string, t: ChainTask): Task {
   const rewardU64 = typeof t.reward === 'string' ? t.reward : String(t.reward ?? 0)
   const isToken = t.paymentType === 'token'
-  // Token rewards are in raw amount (9 decimals for UNIC); SOL rewards are in lamports (9 decimals)
-  const rewardNum = Number(BigInt(rewardU64) / BigInt(1e9))
-  const status: FrontendTaskStatus = CHAIN_TASK_STATUS[t.status] ?? 'open'
+  // Convert lamports/raw to human-readable (preserve decimals)
+  const rewardNum = Number(rewardU64) / 1e9
+  const statusNum = typeof t.status === 'number' ? t.status : parseInt(String(t.status), 10)
+  const status: FrontendTaskStatus = CHAIN_TASK_STATUS[statusNum] ?? 'open'
+
+  // Parse skills — could be comma-separated string or array
+  let skills: string[] = []
+  if (Array.isArray((t as any).requiredSkills)) {
+    skills = (t as any).requiredSkills.filter((s: string) => s && s.trim())
+  } else if (t.skillsRequired) {
+    skills = t.skillsRequired.split(',').map(s => s.trim()).filter(Boolean)
+  }
+
+  const verDeadlineMs = Number(t.verificationDeadline) * 1000
+  const createdAtMs = (t as any).createdAt ? Number((t as any).createdAt) * 1000 : Date.now()
+
   return {
     id: pda,
     title: t.title,
     description: t.description,
     reward: rewardNum,
     status,
-    deadline: new Date(Number(t.deadline) * 1000).toISOString().slice(0, 10),
-    verification_deadline: t.verificationDeadline
-      ? new Date(Number(t.verificationDeadline) * 1000).toISOString().slice(0, 10)
+    deadline: new Date(verDeadlineMs).toISOString().slice(0, 10),
+    verification_deadline: verDeadlineMs
+      ? new Date(verDeadlineMs).toISOString().slice(0, 10)
       : undefined,
     category: t.category || 'General',
-    skills: t.skillsRequired ? t.skillsRequired.split(',').map(s => s.trim()) : [],
-    createdAt: new Date().toISOString().slice(0, 10),
+    skills,
+    createdAt: new Date(createdAtMs).toISOString().slice(0, 10),
     bids: 0,
     bidRange: { min: rewardNum * 0.8, max: rewardNum * 1.2 },
     publisher: t.creator ? { address: t.creator, reputation: 0, tasksCompleted: 0, tasksFailed: 0, joinedDays: 0 } : null,

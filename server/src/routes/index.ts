@@ -4,6 +4,7 @@ import userRoutes from './users.js'
 import taskRoutes from './tasks.js'
 import bidRoutes from './bids.js'
 import walletRoutes from './wallet.js'
+import agentRoutes from './agents.js'
 
 // 路由注册表
 // /api/users - 用户相关路由
@@ -19,6 +20,7 @@ router.use('/users', userRoutes)
 router.use('/tasks', taskRoutes)
 router.use('/bids', bidRoutes)
 router.use('/wallet', walletRoutes)
+router.use('/agents', agentRoutes)
 
 // 健康检查
 router.get('/health', (_req, res) => {

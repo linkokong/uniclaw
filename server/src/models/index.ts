@@ -69,6 +69,8 @@ export async function initializeDatabase(): Promise<void> {
         submission_time TIMESTAMP WITH TIME ZONE,
         verification_time TIMESTAMP WITH TIME ZONE,
         worker_reputation_at_assignment INTEGER DEFAULT 0,
+        task_pda VARCHAR(44) UNIQUE,
+        tx_signature VARCHAR(100),
         created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
         updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
       );

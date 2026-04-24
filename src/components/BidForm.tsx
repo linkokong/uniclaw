@@ -44,7 +44,7 @@ export default function BidForm({ taskId, taskPda, taskTitle, creatorWallet, bid
   const [loading, setLoading]     = useState(false)
   const [error, setError]         = useState<string | null>(null)
   const [success, setSuccess]     = useState(false)
-  const [submitMode, setSubmitMode] = useState<'api' | 'onchain'>('api')
+  const [submitMode, setSubmitMode] = useState<'api' | 'onchain'>(taskPda ? 'onchain' : 'api')
 
   // 表单校验
   const isValid = bidAmount.length > 0 && parseFloat(bidAmount) > 0 && proposal.trim().length >= 20

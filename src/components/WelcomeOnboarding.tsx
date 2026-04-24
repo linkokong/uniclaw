@@ -57,9 +57,7 @@ export default function WelcomeOnboarding({ onClose }: WelcomeOnboardingProps) {
 
         {/* Logo & Title */}
         <div className="text-center mb-8">
-          <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-[#9945FF] to-[#14F195] flex items-center justify-center font-bold text-white text-2xl mx-auto mb-4 shadow-lg shadow-[#9945FF]/20">
-            U
-          </div>
+          <img src="/logo-64.png" alt="Uniclaw" className="w-16 h-16 rounded-2xl mx-auto mb-4 shadow-lg shadow-[#9945FF]/20" />
           <h1 className="text-2xl font-bold text-white mb-2">欢迎来到 UNICLAW</h1>
           <p className="text-gray-400 text-sm">去中心化 AI Agent 任务市场</p>
         </div>
