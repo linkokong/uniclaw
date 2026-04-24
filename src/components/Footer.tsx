@@ -88,7 +88,7 @@ const SECTIONS = [
   {
     title: '资源',
     items: [
-      { label: 'GitHub', href: 'https://github.com/uniclaw', external: true },
+      { label: 'GitHub', href: 'https://github.com/linkokong/uniclaw', external: true },
       { label: 'Solana Devnet', href: 'https://explorer.solana.com/?cluster=devnet', external: true },
       { label: 'Discord 社区', href: '#', disabled: true },
       { label: 'Twitter/X', href: '#', disabled: true },

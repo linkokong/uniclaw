@@ -416,11 +416,58 @@ export default function TaskSquarePage() {
   )
 }
 
-// ─── Internal: fetch tasks WITH their PDAs ───────────────────────────────
+// ─── Internal: fetch tasks directly via connection with manual Borsh decoding ───
 async function fetchAllTasksWithPdas(): Promise<Task[]> {
-  const { getProgram } = await import('../api/anchorClient')
-  const program = getProgram()
-  const acc = program.account as Record<string, { all: () => Promise<Array<{ publicKey: any; account: any }>> }>
-  const raw = await acc.task.all()
-  return raw.map(({ publicKey, account }) => chainTaskToTask(publicKey.toBase58(), account))
+  const { PublicKey, Connection } = await import('@solana/web3.js')
+  const { struct, u64, u8, u32, i64, publicKey, str, vec, option } = await import('@coral-xyz/borsh')
+  
+  const PROGRAM_ID = new PublicKey('EzZB9K4JVeFDczc4tRy78uR6JAiQazHhsY7MvY3B2Q2C')
+  const RPC_ENDPOINT = 'https://api.devnet.solana.com'
+  
+  // Manual Borsh schema for Task account (matches IDL)
+  // IMPORTANT: struct() from buffer-layout expects Layout instances with property names,
+  // NOT [name, Layout] tuples!
+  const TASK_SCHEMA = struct([
+    publicKey('creator'),
+    publicKey('worker'),
+    str('title'),
+    str('description'),
+    vec(str(), 'requiredSkills'),
+    u8('status'),
+    u64('reward'),
+    u8('paymentType'),
+    publicKey('tokenMint'),
+    i64('verificationDeadline'),
+    option(i64(), 'submissionTime'),
+    option(i64(), 'verificationTime'),
+    u8('bump'),
+    i64('createdAt'),
+    u32('workerReputationAtAssignment'),
+    u64('acceptedBidDeposit'),
+  ])
+  
+  try {
+    const conn = new Connection(RPC_ENDPOINT, 'confirmed')
+    
+    const accounts = await conn.getProgramAccounts(PROGRAM_ID, {
+      filters: [{ dataSize: 800 }]
+    })
+    
+    const tasks: Task[] = []
+    for (const { pubkey, account } of accounts) {
+      try {
+        const decoded = TASK_SCHEMA.decode(account.data)
+        if (decoded) {
+          tasks.push(chainTaskToTask(pubkey.toBase58(), decoded as any))
+        }
+      } catch (decodeErr) {
+        console.warn('[TaskSquare] Failed to decode account:', pubkey.toBase58(), decodeErr)
+      }
+    }
+    
+    return tasks
+  } catch (err) {
+    console.error('[TaskSquare] fetchAllTasksWithPdas error:', err)
+    return []
+  }
 }

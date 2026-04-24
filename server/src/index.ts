@@ -11,8 +11,35 @@ import { apiLimiter, authLimiter } from './middleware/rateLimit.js'
 
 const app = express()
 
-// Security middleware
-app.use(helmet())
+// Security middleware - configure helmet to allow Solana RPC connections
+app.use(helmet({
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      connectSrc: [
+        "'self'",
+        "https://api.devnet.solana.com",
+        "https://api.mainnet-beta.solana.com",
+        "https://solana-api.projectserum.com",
+        "wss://api.devnet.solana.com",
+        "wss://api.mainnet-beta.solana.com",
+        "https://explorer-api.walletconnect.com",
+        "https://relay.walletconnect.com",
+        "https://phantom.app"
+      ],
+      imgSrc: ["'self'", "data:", "https:"],
+      scriptSrc: ["'self'"],
+      styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
+      fontSrc: ["'self'", "data:", "https://fonts.gstatic.com"],
+      objectSrc: ["'none'"],
+      baseUri: ["'self'"],
+      formAction: ["'self'"],
+      frameAncestors: ["'none'"],
+      upgradeInsecureRequests: []
+    }
+  },
+  crossOriginEmbedderPolicy: false
+}))
 app.use(compression())
 
 // CORS
