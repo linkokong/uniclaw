@@ -24,6 +24,8 @@ export default {
         // Borders
         border: {
           DEFAULT: '#1f2937',
+          light: '#2d3748',
+          default: '#1f2937',
           hover: 'rgba(153,69,255,0.4)',
           active: '#9945FF',
         },

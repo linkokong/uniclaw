@@ -54,16 +54,44 @@ export function getProgram(
     publicKey: PublicKey
   } | null,
 ) {
-  if (!wallet) {
-    return new Program({ idl, provider: getReadOnlyProvider() })
+  // ─── structuredClone polyfill ────────────────────────────────────────────
+  // Anchor SDK 0.32+ calls structuredClone internally in new Program(),
+  // but the provider/wallet objects contain non-cloneable function refs.
+  // We temporarily patch structuredClone to fall back to JSON serialization.
+  const _origClone = globalThis.structuredClone
+  globalThis.structuredClone = <T,>(obj: T): T => {
+    try {
+      return _origClone(obj)
+    } catch {
+      // Strip functions, handle circular refs, preserve BigInt as string
+      const seen = new WeakSet()
+      const replacer = (key: string, value: unknown) => {
+        if (typeof value === 'function') return undefined
+        if (typeof value === 'bigint') return value.toString()
+        if (typeof value === 'object' && value !== null) {
+          if (seen.has(value)) return '[Circular]'
+          seen.add(value)
+        }
+        return value
+      }
+      return JSON.parse(JSON.stringify(obj, replacer)) as T
+    }
   }
-  // AnchorProvider expects its own Wallet type; cast through unknown to satisfy TS
-  const anchorWallet = wallet as unknown as Wallet
-  const provider = new AnchorProvider(connection, anchorWallet, {
-    commitment: 'confirmed',
-    preflightCommitment: 'confirmed',
-  })
-  return new Program({ idl, provider })
+
+  try {
+    if (!wallet) {
+      return new Program({ idl, provider: getReadOnlyProvider() })
+    }
+    const anchorWallet = wallet as unknown as Wallet
+    const provider = new AnchorProvider(connection, anchorWallet, {
+      commitment: 'confirmed',
+      preflightCommitment: 'confirmed',
+    })
+    return new Program({ idl, provider })
+  } finally {
+    // Always restore the original structuredClone
+    globalThis.structuredClone = _origClone
+  }
 }
 
 // ─── Standardised Chain Error Classifier (H4 fix) ──────────────────────────
