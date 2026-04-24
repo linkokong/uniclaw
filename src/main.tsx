@@ -51,8 +51,13 @@ function getWallets(): BaseWalletAdapter[] {
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <QueryClientProvider client={queryClient}>
     <ConnectionProvider endpoint={endpoint}>
-      {/* autoConnect=false: prevents "Provider local is not available" error when no wallet extension is installed */}
-      <WalletProvider wallets={getWallets()} autoConnect={false}>
+      {/* autoConnect: when user selects a wallet in the modal, auto-connect fires immediately */}
+      <WalletProvider wallets={getWallets()} autoConnect onError={(error, adapter) => {
+        // Suppress WalletNotReadyError — thrown when wallet extension not installed
+        if (error.name !== 'WalletNotReadyError') {
+          console.error('[Wallet]', error, adapter)
+        }
+      }}>
         <WalletModalProvider>
           <BrowserRouter>
             <App />

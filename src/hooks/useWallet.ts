@@ -84,10 +84,18 @@ export function useWalletState(): UseWalletReturn {
     return () => clearInterval(interval)
   }, [connected, publicKey, refreshBalance])
 
-  // Connect wallet - opens modal
+  // Connect wallet - if already selected, connect directly; otherwise open modal
   const connect = useCallback(() => {
-    setVisible(true)
-  }, [setVisible])
+    if (wallet && !connected) {
+      // Wallet already selected (e.g. from localStorage) — connect directly
+      wallet.adapter.connect().catch((err) => {
+        console.error('[Wallet] connect failed:', err)
+      })
+    } else {
+      // No wallet selected — open modal to choose one
+      setVisible(true)
+    }
+  }, [wallet, connected, setVisible])
 
   return {
     // State
