@@ -6,7 +6,7 @@ interface HeaderProps {
   isMobile?: boolean
 }
 
-export default function Header({ onToggleSidebar, isMobile }: HeaderProps) {
+export default function Header({ onToggleSidebar }: HeaderProps) {
   const location = useLocation()
 
   // Header 只保留核心入口，避免和侧边栏重复
@@ -31,7 +31,7 @@ export default function Header({ onToggleSidebar, isMobile }: HeaderProps) {
           </svg>
         </button>
         <Link to="/" className="flex items-center gap-2 group">
-          <img src="/logo-header.png" alt="Uniclaw" className="h-8 group-hover:opacity-90 transition-opacity" />
+          <img src="/logo-header.jpeg" alt="Uniclaw" className="h-8 group-hover:opacity-90 transition-opacity" />
         </Link>
       </div>
 

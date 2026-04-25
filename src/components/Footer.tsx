@@ -257,7 +257,7 @@ export default function Footer() {
   /** 处理链接/按钮点击 */
   const handleItemClick = (item: typeof SECTIONS[0]['items'][0]) => {
     if ('action' in item && item.action) {
-      setWpOpen(wpOpen === item.action ? null : item.action)
+      setWpOpen(wpOpen === item.action ? null : (item.action as string))
     }
   }
 
@@ -309,7 +309,7 @@ export default function Footer() {
                 </h5>
                 <ul className="space-y-2">
                   {section.items.map((item) => ('href' in item ? (
-                    <li key={item.label}>
+                    <li key={(item as {label:string}).label}>
                       <a
                         href={(item as {href:string}).href}
                         target={'external' in item && (item as {external:boolean}).external ? '_blank' : undefined}
@@ -320,16 +320,16 @@ export default function Footer() {
                             : 'text-text-secondary hover:text-text-accent cursor-pointer'
                         }`}
                       >
-                        {item.label}{(item as {external?:boolean}).external && ' ↗'}
+                        {(item as {label:string}).label}{(item as {external?:boolean}).external && ' ↗'}
                       </a>
                     </li>
                   ) : (
-                    <li key={item.label}>
+                    <li key={(item as {label:string}).label}>
                       <button
-                        onClick={() => handleItemClick(item)}
+                        onClick={() => handleItemClick(item as any)}
                         className="text-xs text-text-secondary hover:text-text-accent transition-colors cursor-pointer underline decoration-dotted underline-offset-2"
                       >
-                        {item.label}
+                        {(item as {label:string}).label}
                       </button>
                     </li>
                   )))}
@@ -352,7 +352,7 @@ export default function Footer() {
                 {navExpanded === section.title && (
                   <ul className="pb-3 space-y-2">
                     {section.items.map((item) => ('href' in item ? (
-                      <li key={item.label}>
+                      <li key={(item as {label:string}).label}>
                         <a
                           href={(item as {href:string}).href}
                           className={`block text-xs py-1 ${
@@ -361,16 +361,16 @@ export default function Footer() {
                               : 'text-text-secondary hover:text-text-accent'
                           }`}
                         >
-                          {item.label}
+                          {(item as {label:string}).label}
                         </a>
                       </li>
                     ) : (
-                      <li key={item.label}>
+                      <li key={(item as {label:string}).label}>
                         <button
-                          onClick={() => handleItemClick(item)}
+                          onClick={() => handleItemClick(item as any)}
                           className="block text-xs text-left text-text-secondary hover:text-text-accent py-1 w-full"
                         >
-                          {item.label}
+                          {(item as {label:string}).label}
                         </button>
                       </li>
                     )))}

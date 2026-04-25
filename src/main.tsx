@@ -48,6 +48,7 @@ function getWallets(): BaseWalletAdapter[] {
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <QueryClientProvider client={queryClient}>
+    {/* @ts-ignore - ConnectionProvider type mismatch with React 19 */}
     <ConnectionProvider endpoint={endpoint}>
       <WalletProvider wallets={getWallets()} autoConnect onError={(error) => {
         if (error.name !== 'WalletNotReadyError') {
