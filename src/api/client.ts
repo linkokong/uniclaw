@@ -7,7 +7,9 @@ import axios, { type AxiosInstance, type InternalAxiosRequestConfig } from 'axio
 import { parseApiError } from './transformers'
 import type { ApiResponse } from '../types/api'
 
-const BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api/v1'
+// Auto-detect API base: if VITE_API_URL is set use it, otherwise derive from current origin
+// This makes tunnel deployments work automatically (same origin = same port)
+const BASE_URL = import.meta.env.VITE_API_URL || `${window.location.origin}/api/v1`
 const TIMEOUT = 10000
 const TOKEN_KEY = 'claw_wallet_token'
 

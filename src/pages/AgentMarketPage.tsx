@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { useWallet } from '@solana/wallet-adapter-react'
 import { Link } from 'react-router-dom'
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api/v1'
+const API_URL = import.meta.env.VITE_API_URL || `${window.location.origin}/api/v1`
 
 interface AgentListing {
   id: string

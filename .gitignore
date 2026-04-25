@@ -48,15 +48,18 @@ target/
 *.dylib
 Cargo.lock
 
-# Screenshots
+# Screenshots (temp)
 screenshots/
+.playwright-mcp/
 
 # Misc
 screenshot*
-*.png
 *.pem
 *.key
 
 # Server
 server/dist/
 server/node_modules/
+
+# Dev temp
+.dev-pids/

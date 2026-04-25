@@ -26,6 +26,7 @@
     "express-rate-limit": "^7.5.0",
     "express-validator": "^7.3.2",
     "helmet": "^8.0.0",
+    "http-proxy-middleware": "^3.0.5",
     "ioredis": "^5.4.2",
     "jose": "^5.9.6",
     "pg": "^8.13.2",

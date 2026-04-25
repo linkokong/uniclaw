@@ -4,8 +4,8 @@ import { Link } from 'react-router-dom'
 // fetchAllTasks removed — using fetchAllTasksWithPdas directly
 import { chainTaskToTask, Task } from '../types/api'
 
-// ─── Auto-refresh interval (30 seconds) ───────────────────────────────────
-const TASK_REFRESH_INTERVAL = 30000 // ms
+// ─── Auto-refresh interval (2 minutes — avoid Devnet RPC rate limits) ───
+const TASK_REFRESH_INTERVAL = 120000 // ms
 
 // ─── Filter Types ─────────────────────────────────────────────────────────
 type TaskType = 'all' | 'open' | 'assigned' | 'in_progress' | 'submitted'
@@ -55,7 +55,7 @@ function FilterPill({ active, onClick, children }: { active: boolean; onClick: (
   return (
     <button
       onClick={onClick}
-      className={`px-4 py-1.5 rounded-full text-sm font-medium transition-all duration-200 ${
+      className={`px-2.5 sm:px-4 py-1 sm:py-1.5 rounded-full text-xs sm:text-sm font-medium transition-all duration-200 whitespace-nowrap ${
         active
           ? 'bg-gradient-to-r from-[#9945FF] to-[#14F195] text-white shadow-md'
           : 'bg-gray-800/60 text-gray-400 hover:text-white hover:bg-gray-700/60 border border-gray-700/50'
@@ -69,7 +69,7 @@ function FilterPill({ active, onClick, children }: { active: boolean; onClick: (
 // ─── Primary Button ───────────────────────────────────────────────────────
 function PrimaryBtn({ children, disabled }: { children: React.ReactNode; disabled?: boolean }) {
   return (
-    <span className={`inline-block px-5 py-2.5 rounded-xl text-sm font-semibold transition-all duration-200 ${
+    <span className={`inline-block px-3 sm:px-5 py-1.5 sm:py-2.5 rounded-lg sm:rounded-xl text-xs sm:text-sm font-semibold transition-all duration-200 ${
       disabled
         ? 'bg-gray-700/50 text-gray-500 cursor-not-allowed'
         : 'bg-gradient-to-r from-[#9945FF] to-[#14F195] text-white opacity-90'
@@ -176,58 +176,44 @@ function TaskCard({ task }: { task: Task }) {
 
   return (
     <Link to={`/tasks/${task.id}`}>
-      <article className="group bg-[#111827] border border-gray-800/70 rounded-2xl p-5 hover:border-[#9945FF]/40 hover:bg-[#1a2235] hover:shadow-xl hover:shadow-purple-500/5 transition-all duration-250 cursor-pointer">
+      <article className="group bg-[#111827] border border-gray-800/70 rounded-xl sm:rounded-2xl p-3.5 sm:p-5 hover:border-[#9945FF]/40 hover:bg-[#1a2235] hover:shadow-xl hover:shadow-purple-500/5 transition-all duration-250 cursor-pointer">
         {/* Header Row */}
-        <div className="flex items-start justify-between mb-3">
+        <div className="flex items-start justify-between mb-2 sm:mb-3 gap-2">
           <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2 mb-1.5 flex-wrap">
+            <div className="flex items-center gap-1.5 mb-1 flex-wrap">
               <CategoryBadge label={task.category} />
               <StatusBadge status={task.status} />
             </div>
-            <h3 className="text-base font-semibold text-white group-hover:text-[#14F195] transition-colors leading-snug">
+            <h3 className="text-sm sm:text-base font-semibold text-white group-hover:text-[#14F195] transition-colors leading-snug line-clamp-1">
               {task.title || 'Untitled Task'}
             </h3>
           </div>
-          {/* Reward */}
-          <div className="ml-4 text-right shrink-0">
-            <div className="flex items-center justify-end gap-1.5">
-              <p className="text-lg font-bold text-[#14F195]">{task.reward} {task.paymentType === 'token' ? 'UNIC' : 'SOL'}</p>
-              {task.paymentType === 'token' && (
-                <span className="text-[10px] font-medium bg-purple-500/20 text-purple-300 px-1.5 py-0.5 rounded">TOKEN</span>
-              )}
-            </div>
-            <p className={`text-xs ${deadlineColor}`}>
+          <div className="text-right shrink-0">
+            <p className="text-sm sm:text-lg font-bold text-[#14F195]">{task.reward} {task.paymentType === 'token' ? 'UNIC' : 'SOL'}</p>
+            <p className={`text-[10px] sm:text-xs ${deadlineColor}`}>
               {daysLeft > 0 ? `${daysLeft}d left` : daysLeft === 0 ? 'Today' : 'Expired'}
             </p>
           </div>
         </div>
 
         {/* Description */}
-        <p className="text-gray-400 text-sm leading-relaxed mb-4 line-clamp-2">
+        <p className="text-gray-400 text-xs sm:text-sm leading-relaxed mb-3 line-clamp-2">
           {task.description || 'No description provided'}
         </p>
 
         {/* Skills */}
-        <div className="flex flex-wrap gap-1.5 mb-4">
-          {(task.skills ?? []).map((s, i) => <SkillTag key={i} label={s} />)}
-          {(task.skills ?? []).length === 0 && (
-            <span className="text-xs text-gray-600 italic">No skills specified</span>
-          )}
+        <div className="flex flex-wrap gap-1 mb-3">
+          {(task.skills ?? []).slice(0, 4).map((s, i) => <SkillTag key={i} label={s} />)}
         </div>
 
         {/* Footer */}
-        <div className="flex items-center justify-between pt-3 border-t border-gray-800/50">
-          <div className="flex items-center gap-3 text-xs text-gray-500">
-            <span className="flex items-center gap-1">
-              <span>👥</span> {task.bids ?? 0} bids
-            </span>
-            <span className="hidden sm:inline">•</span>
-            <span className="hidden sm:inline flex items-center gap-1">
-              <span>📅</span> {task.deadline}
-            </span>
+        <div className="flex items-center justify-between pt-2.5 border-t border-gray-800/50">
+          <div className="flex items-center gap-2 text-[10px] sm:text-xs text-gray-500">
+            <span>👥 {task.bids ?? 0} bids</span>
+            <span className="hidden sm:inline">• 📅 {task.deadline}</span>
           </div>
           <PrimaryBtn disabled={!connected || !isOpen}>
-            {isOpen ? 'View Details →' : 'Unavailable'}
+            {isOpen ? 'Details →' : 'N/A'}
           </PrimaryBtn>
         </div>
       </article>
@@ -248,16 +234,14 @@ export default function TaskSquarePage() {
   const [refreshing, setRefreshing] = useState(false)
   const cancelledRef = useRef(false)
 
-  // Load tasks: try backend DB first (fast, supports filtering), chain as fallback
+  // Load tasks: DB first (fast), chain only on manual refresh to avoid 429
   const loadTasks = useCallback(async (isRefresh = false) => {
     if (isRefresh) setRefreshing(true)
     try {
-      // Try backend DB first
-      const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api/v1'
+      const API_URL = import.meta.env.VITE_API_URL || `${window.location.origin}/api/v1`
       const dbRes = await fetch(`${API_URL}/tasks?limit=100`).then(r => r.json()).catch(() => null)
-      
+
       if (dbRes?.success && dbRes.data?.length > 0) {
-        // DB has tasks — use them, also merge with chain data in background
         const dbTasks: Task[] = dbRes.data.map((raw: any) => ({
           id: raw.task_pda || raw.id,
           title: raw.title,
@@ -277,29 +261,38 @@ export default function TaskSquarePage() {
           setTasks(dbTasks)
           setError(null)
         }
-        // Also fetch chain data in background to merge any tasks not yet synced
-        fetchAllTasksWithPdas().then(chainTasks => {
-          if (cancelledRef.current) return
-          // Merge: use chain tasks as base, DB tasks fill in any gaps
+      }
+
+      // Only fetch from chain on manual refresh (button click) to avoid 429
+      if (isRefresh || !(dbRes?.success && dbRes.data?.length > 0)) {
+        const chainTasks = await fetchAllTasksWithPdas()
+        if (!cancelledRef.current && chainTasks.length > 0) {
+          // Merge with DB tasks
           const merged = new Map<string, Task>()
           for (const t of chainTasks) merged.set(t.id, t)
-          for (const t of dbTasks) {
-            if (!merged.has(t.id)) merged.set(t.id, t)
+          // DB tasks that aren't on chain (shouldn't happen, but safe)
+          if (dbRes?.data) {
+            for (const t of (dbRes.data as any[])) {
+              const key = t.task_pda || t.id
+              if (!merged.has(key)) {
+                merged.set(key, {
+                  id: key, title: t.title, description: t.description,
+                  reward: parseFloat(t.reward) || 0,
+                  status: t.status === 'created' ? 'open' : t.status,
+                  deadline: t.verification_deadline ? new Date(t.verification_deadline).toISOString().slice(0, 10) : '',
+                  category: 'General', skills: t.required_skills || [], createdAt: '',
+                  bids: 0, bidRange: { min: 0, max: 0 }, publisher: null, paymentType: 'sol',
+                })
+              }
+            }
           }
           setTasks(Array.from(merged.values()))
-        }).catch(() => {/* chain fetch failed, DB data is fine */})
-      } else {
-        // DB empty or unavailable — fall back to chain
-        const converted = await fetchAllTasksWithPdas()
-        if (!cancelledRef.current) {
-          setTasks(converted)
-          setError(null)
         }
       }
     } catch (err) {
       if (!cancelledRef.current) {
-        console.error('[TaskSquare] fetchAllTasks error:', err)
-        setError('Failed to load tasks from chain. Showing demo data.')
+        console.error('[TaskSquare] load error:', err)
+        setError('Failed to load tasks')
       }
     } finally {
       if (!cancelledRef.current) {
@@ -316,7 +309,6 @@ export default function TaskSquarePage() {
 
     // Auto-refresh polling every 30 seconds
     const intervalId = setInterval(() => {
-      console.log('[TaskSquare] Auto-refreshing tasks...')
       loadTasks()
     }, TASK_REFRESH_INTERVAL)
 
@@ -353,67 +345,59 @@ export default function TaskSquarePage() {
   const openCount = tasks.filter(t => t.status === 'open').length
 
   return (
-    <div className="space-y-6 max-w-5xl">
+    <div className="space-y-4 sm:space-y-6 max-w-5xl mx-auto">
 
       {/* ── Page Header ── */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold text-white">Task Square</h1>
-          <p className="text-gray-500 text-sm mt-0.5">
+          <h1 className="text-xl sm:text-2xl font-bold text-white">Task Square</h1>
+          <p className="text-gray-500 text-xs sm:text-sm mt-0.5">
             {loading
               ? 'Loading from chain...'
               : error
                 ? `${openCount} open · using demo data`
-                : `${openCount} open tasks · ${tasks.length} total · Solana Devnet`
+                : `${openCount} open · ${tasks.length} total · Solana Devnet`
             }
           </p>
         </div>
-        <Link
-          to="/create-task"
-          className="flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-[#9945FF] to-[#14F195] rounded-xl text-sm font-semibold text-white hover:opacity-90 transition-opacity"
-        >
-          <span className="text-base">+</span>
-          Post Task
-        </Link>
-        <button
-          onClick={() => loadTasks(true)}
-          disabled={refreshing}
-          className="flex items-center gap-2 px-4 py-2.5 bg-gray-800 border border-gray-700 rounded-xl text-sm text-gray-300 hover:bg-gray-700 hover:text-white transition-colors disabled:opacity-50"
-        >
-          <span className={`text-base ${refreshing ? 'animate-spin' : ''}`}>↻</span>
-          {refreshing ? 'Refreshing...' : 'Refresh'}
-        </button>
+        <div className="flex items-center gap-2">
+          <Link
+            to="/create-task"
+            className="flex items-center gap-1.5 px-3 sm:px-5 py-2 bg-gradient-to-r from-[#9945FF] to-[#14F195] rounded-lg sm:rounded-xl text-xs sm:text-sm font-semibold text-white hover:opacity-90 transition-opacity"
+          >
+            <span>+</span> Post Task
+          </Link>
+          <button
+            onClick={() => loadTasks(true)}
+            disabled={refreshing}
+            className="flex items-center gap-1.5 px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg sm:rounded-xl text-xs sm:text-sm text-gray-300 hover:bg-gray-700 hover:text-white transition-colors disabled:opacity-50"
+          >
+            <span className={refreshing ? 'animate-spin' : ''}>↻</span>
+            <span className="hidden sm:inline">{refreshing ? 'Refreshing...' : 'Refresh'}</span>
+          </button>
+        </div>
       </div>
 
       {/* ── Wallet Banner ── */}
       {!connected && <WalletBanner />}
 
-      {/* ── Filters Row ── */}
-      <div className="bg-[#111827] border border-gray-800/70 rounded-2xl p-4 space-y-4">
+      {/* ── Filters ── */}
+      <div className="bg-[#111827] border border-gray-800/70 rounded-xl sm:rounded-2xl p-3 sm:p-4 space-y-3">
         <SearchInput value={searchQuery} onChange={setSearchQuery} />
-        <div className="flex flex-wrap items-center gap-3">
-          <div className="flex items-center gap-2">
-            <span className="text-xs text-gray-500 font-medium">Type:</span>
-            <div className="flex gap-2">
-              {(['all', 'open', 'assigned', 'in_progress', 'submitted'] as TaskType[]).map((f) => (
-                <FilterPill key={f} active={typeFilter === f} onClick={() => setTypeFilter(f)}>
-                  {f === 'all' ? 'All' : f === 'open' ? 'Open' : f === 'assigned' ? 'Assigned' : f === 'in_progress' ? 'In Progress' : 'Submitted'}
-                </FilterPill>
-              ))}
-            </div>
+        <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-hide">
+          <div className="flex items-center gap-1.5 shrink-0">
+            <span className="text-[10px] sm:text-xs text-gray-500">Type:</span>
+            {(['all', 'open', 'assigned', 'in_progress', 'submitted'] as TaskType[]).map((f) => (
+              <FilterPill key={f} active={typeFilter === f} onClick={() => setTypeFilter(f)}>
+                {f === 'all' ? 'All' : f === 'open' ? 'Open' : f === 'assigned' ? 'Assigned' : f === 'in_progress' ? 'Active' : 'Done'}
+              </FilterPill>
+            ))}
           </div>
-          <span className="hidden sm:inline text-gray-700">|</span>
-          <div className="flex items-center gap-2">
-            <span className="text-xs text-gray-500 font-medium">Budget:</span>
-            <BudgetFilter value={budgetFilter} onChange={setBudgetFilter} />
-          </div>
-          <span className="hidden sm:inline text-gray-700">|</span>
-          <div className="flex items-center gap-2">
-            <span className="text-xs text-gray-500 font-medium">Sort:</span>
-            <SortFilter value={sortBy} onChange={setSortBy} />
-          </div>
-          <span className="ml-auto text-xs text-gray-500">
-            {loading ? '...' : `${filtered.length} result${filtered.length !== 1 ? 's' : ''}`}
+          <span className="text-gray-800 shrink-0">|</span>
+          <BudgetFilter value={budgetFilter} onChange={setBudgetFilter} />
+          <SortFilter value={sortBy} onChange={setSortBy} />
+          <span className="ml-auto text-[10px] sm:text-xs text-gray-500 shrink-0">
+            {loading ? '...' : `${filtered.length}`}
           </span>
         </div>
       </div>

@@ -3,6 +3,7 @@ import cors from 'cors'
 import helmet from 'helmet'
 import compression from 'compression'
 import path from 'path'
+import { createProxyMiddleware } from 'http-proxy-middleware'
 import { config } from './config/index.js'
 import { initializeDatabase, closeConnections } from './models/index.js'
 import routes from './routes/index.js'
@@ -11,21 +12,20 @@ import { apiLimiter, authLimiter } from './middleware/rateLimit.js'
 
 const app = express()
 
-// Security middleware - configure helmet to allow Solana RPC connections
+// Security middleware — relaxed in dev for Vite proxy + Solana RPC
 app.use(helmet({
-  contentSecurityPolicy: {
+  contentSecurityPolicy: config.nodeEnv === 'production' ? {
     directives: {
       defaultSrc: ["'self'"],
       connectSrc: [
         "'self'",
         "https://api.devnet.solana.com",
         "https://api.mainnet-beta.solana.com",
-        "https://solana-api.projectserum.com",
         "wss://api.devnet.solana.com",
         "wss://api.mainnet-beta.solana.com",
         "https://explorer-api.walletconnect.com",
         "https://relay.walletconnect.com",
-        "https://phantom.app"
+        "https://phantom.app",
       ],
       imgSrc: ["'self'", "data:", "https:"],
       scriptSrc: ["'self'"],
@@ -35,17 +35,16 @@ app.use(helmet({
       baseUri: ["'self'"],
       formAction: ["'self'"],
       frameAncestors: ["'none'"],
-      upgradeInsecureRequests: []
     }
-  },
-  crossOriginEmbedderPolicy: false
+  } : false,  // Disable CSP in dev (Vite injects inline scripts)
+  crossOriginEmbedderPolicy: false,
 }))
 app.use(compression())
 
 // CORS
 app.use(cors({
   origin: config.corsOrigins,
-  credentials: true
+  credentials: true,
 }))
 
 // Body parsing
@@ -57,25 +56,35 @@ app.get('/health', (_, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() })
 })
 
-// Rate limiting for auth endpoints
+// Rate limiting
 app.use(`${config.apiPrefix}/auth`, authLimiter)
-
-// General API rate limiting
 app.use(config.apiPrefix, apiLimiter)
 
 // API routes
 app.use(config.apiPrefix, routes)
 
-// Serve built frontend (production only)
-const distPath = path.resolve(__dirname, '../../dist')
+// ── Frontend serving ─────────────────────────────────────────────────────
 if (config.nodeEnv === 'production') {
+  // Production: serve built static files from dist/
+  const distPath = path.resolve(__dirname, '../../dist')
   app.use(express.static(distPath))
   app.get('*', (_, res) => {
     res.sendFile(path.join(distPath, 'index.html'))
   })
+} else {
+  // Development: reverse proxy to Vite dev server (port 5173)
+  // This allows tunnel (cloudflare/ngrok) on port 3001 with full HMR support
+  const VITE_PORT = process.env.VITE_PORT || '5173'
+  const viteProxy = createProxyMiddleware({
+    target: `http://localhost:${VITE_PORT}`,
+    changeOrigin: true,
+    ws: true,  // Proxy WebSocket for Vite HMR
+    logLevel: 'warn',
+  })
+  app.use(viteProxy)
 }
 
-// Error handling
+// Error handling (only reached if no proxy/static match)
 app.use(notFoundHandler)
 app.use(errorHandler)
 
@@ -85,20 +94,20 @@ const shutdown = async () => {
   await closeConnections()
   process.exit(0)
 }
-
 process.on('SIGTERM', shutdown)
 process.on('SIGINT', shutdown)
 
-// Start server
+// Start
 async function main() {
   try {
-    // Initialize database
     await initializeDatabase()
-    
     app.listen(config.port, () => {
       console.log(`🚀 Claw Universe API running on port ${config.port}`)
       console.log(`📍 API prefix: ${config.apiPrefix}`)
       console.log(`🌍 Environment: ${config.nodeEnv}`)
+      if (config.nodeEnv !== 'production') {
+        console.log(`🔀 Dev proxy: non-API requests → http://localhost:${process.env.VITE_PORT || '5173'} (Vite HMR)`)
+      }
     })
   } catch (error) {
     console.error('Failed to start server:', error)
