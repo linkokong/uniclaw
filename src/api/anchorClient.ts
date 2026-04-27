@@ -855,16 +855,7 @@ export async function fetchBidsByBidder(bidderPk: PublicKey): Promise<Array<{ pu
       { memcmp: { offset: 41, bytes: bidderPk.toBase58() } }, // bidder at offset 41 (8 disc + 32 pubkey)
     ],
   })
-  // Manual Borsh schema for bid account (matches IDL)
-  const BID_SCHEMA = new Map([
-    ['task', { kind: 'publicKey' }],
-    ['bidder', { kind: 'publicKey' }],
-    ['proposal', { kind: 'string' }],
-    ['deposit', { kind: 'u64' }],
-    ['status', { kind: 'u8' }],
-    ['createdAt', { kind: 'i64' }],
-    ['bump', { kind: 'u8' }],
-  ])
+  // Manual Borsh layout for bid account (matches IDL)
   const { struct, u64, u8, i64, publicKey, str } = await import('@coral-xyz/borsh')
   const BID_LAYOUT = struct([
     publicKey('task'),
