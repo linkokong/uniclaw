@@ -63,10 +63,10 @@ export async function walletLogin(): Promise<string | null> {
 
   try {
     // Step 1: 获取 nonce
-    const nonceRes = await axios.get(`${BASE_URL}/users/nonce`, {
+    const nonceRes = await axios.get<{ nonce: string; expiresIn: number }>(`${BASE_URL}/auth/nonce`, {
       params: { wallet: walletAddress },
     })
-    const nonce = (nonceRes.data as ApiResponse<{ nonce: string }>).data.nonce
+    const nonce = nonceRes.data.nonce
 
     // Step 2: 构造 EIP-4361 消息
     const domain = window.location.host
