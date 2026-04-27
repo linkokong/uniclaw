@@ -21,7 +21,6 @@ const bottomItems = [
   { path: '/whitepaper', label: '白皮书', icon: '📜' },
   { path: '/privacy', label: '隐私政策', icon: '🔒' },
   { path: '/terms', label: '服务条款', icon: '📄' },
-  { path: '/settings', label: '设置', icon: '⚙️' },
 ]
 
 interface SidebarProps {

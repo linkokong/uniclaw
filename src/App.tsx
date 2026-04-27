@@ -1,4 +1,4 @@
-import { Routes, Route } from 'react-router-dom';
+import { Routes, Route, useNavigate } from 'react-router-dom';
 import { useState, useEffect } from 'react';
 import { Layout } from './components/Layout';
 import WelcomeOnboarding from './components/WelcomeOnboarding';
@@ -18,6 +18,7 @@ import RegisterProfile from './pages/RegisterProfile';
 import LegalPage from './pages/LegalPage';
 
 export default function App() {
+  const navigate = useNavigate()
   const [showOnboarding, setShowOnboarding] = useState(false);
 
   useEffect(() => {
@@ -42,8 +43,8 @@ export default function App() {
           <Route path="/task/create" element={<TaskCreatePage />} />
           <Route path="/create-task" element={<TaskCreatePage />} />
           <Route path="/profile" element={<UserProfile />} />
-          <Route path="/users/me" element={<UserProfile />} />
-          <Route path="/register" element={<RegisterProfile />} />
+          <Route path="/profile/me" element={<UserProfile />} />
+          <Route path="/register" element={<RegisterProfile onComplete={() => { navigate('/'); window.location.reload() }} />} />
           <Route path="/my-bids" element={<MyBidsPage />} />
           <Route path="/my-tasks" element={<MyTasksPage />} />
           <Route path="/earnings" element={<EarningsPage />} />

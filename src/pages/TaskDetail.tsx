@@ -354,6 +354,11 @@ export default function TaskDetailPage() {
           <span className={`text-xs ${deadlineColor}`}>
             📅 {daysLeft > 0 ? `${daysLeft} days left` : daysLeft === 0 ? 'Due today' : 'Deadline passed'}
           </span>
+          {task.status === 'submitted' && task.verification_deadline && (
+            <span className="text-xs text-orange-400">
+              ⏱ Verify by {new Date(task.verification_deadline).toLocaleDateString()}
+            </span>
+          )}
           {task.paymentType === 'token' && (
             <span className="text-[10px] font-medium bg-purple-500/20 text-purple-300 px-1.5 py-0.5 rounded">TOKEN</span>
           )}

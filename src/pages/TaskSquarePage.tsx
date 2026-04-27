@@ -389,7 +389,7 @@ export default function TaskSquarePage() {
             <span className="text-[10px] sm:text-xs text-gray-500">Type:</span>
             {(['all', 'open', 'assigned', 'in_progress', 'submitted'] as TaskType[]).map((f) => (
               <FilterPill key={f} active={typeFilter === f} onClick={() => setTypeFilter(f)}>
-                {f === 'all' ? 'All' : f === 'open' ? 'Open' : f === 'assigned' ? 'Assigned' : f === 'in_progress' ? 'Active' : 'Done'}
+                {f === 'all' ? 'All' : f === 'open' ? 'Open' : f === 'assigned' ? 'Assigned' : f === 'in_progress' ? 'Active' : f === 'submitted' ? 'Submitted' : f}
               </FilterPill>
             ))}
           </div>
