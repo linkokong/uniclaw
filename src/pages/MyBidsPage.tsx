@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useWallet } from '@solana/wallet-adapter-react'
 import { Link } from 'react-router-dom'
-import { getProgram, withdrawBid, classifyChainError } from '../api/anchorClient'
+import { withdrawBid, classifyChainError, fetchBidsByBidder, fetchTask } from '../api/anchorClient'
 import { PublicKey } from '@solana/web3.js'
 
 interface MyBid {
@@ -33,30 +33,27 @@ export default function MyBidsPage() {
     setLoading(true)
     setError(null)
     try {
-      const program = getProgram()
-      const acc = program.account as Record<string, { all: (filters?: any[]) => Promise<Array<{ publicKey: any; account: any }>> }>
-      const allBids = await acc.bidEscrow.all([
-        { memcmp: { offset: 8, bytes: publicKey.toBase58() } }
-      ])
-      
+      const bids = await fetchBidsByBidder(publicKey)
+
       const bidsWithTasks = await Promise.all(
-        allBids.map(async ({ publicKey: bidPda, account: bid }) => {
+        bids.map(async ({ pubkey: bidPda, data: bid }) => {
           try {
-            const taskAcc = await (program.account as any).task.fetch(bid.task)
+            const task = await fetchTask(bid.task as PublicKey) as any
+            const taskData = (task && typeof task === 'object') ? task : {}
             return {
-              pda: bidPda.toBase58(),
-              taskPda: bid.task.toBase58(),
-              amount: bid.amount / 1e9,
-              taskTitle: taskAcc.title || 'Untitled',
-              taskReward: (taskAcc.reward || 0) / 1e9,
-              taskStatus: getTaskStatusName(taskAcc.status)
+              pda: bidPda,
+              taskPda: (bid.task as PublicKey).toBase58(),
+              amount: Number(bid.deposit) / 1e9,
+              taskTitle: taskData.title || 'Untitled',
+              taskReward: (taskData.reward || 0) / 1e9,
+              taskStatus: getTaskStatusName(taskData.status)
             }
           } catch {
             return null
           }
         })
       )
-      
+
       setBids(bidsWithTasks.filter((b): b is MyBid => b !== null))
     } catch (err) {
       console.error('loadMyBids error:', err)
@@ -150,7 +147,7 @@ export default function MyBidsPage() {
                   <p className="text-xs text-gray-500">Your bid</p>
                 </div>
               </div>
-              
+
               <div className="flex items-center justify-between pt-3 border-t border-gray-800">
                 <span className={`text-xs px-2.5 py-1 rounded-full ${
                   bid.taskStatus === 'Open' ? 'bg-emerald-500/15 text-emerald-400' :
@@ -159,7 +156,7 @@ export default function MyBidsPage() {
                 }`}>
                   {bid.taskStatus}
                 </span>
-                
+
                 {bid.taskStatus === 'Open' && (
                   <button
                     onClick={() => handleCancelBid(bid.pda, bid.taskPda)}

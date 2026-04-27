@@ -847,6 +847,50 @@ export async function fetchTreasury(treasury: PublicKey) {
   return acc.platformTreasury.fetch(treasury)
 }
 
+/** Fetch ALL Bid accounts for a specific bidder via getProgramAccounts (bypasses Anchor SDK structuredClone) */
+export async function fetchBidsByBidder(bidderPk: PublicKey): Promise<Array<{ pubkey: string; data: Record<string, unknown> }>> {
+  const accounts = await connection.getProgramAccounts(PROGRAM_ID, {
+    filters: [
+      { dataSize: 200 },
+      { memcmp: { offset: 41, bytes: bidderPk.toBase58() } }, // bidder at offset 41 (8 disc + 32 pubkey)
+    ],
+  })
+  // Manual Borsh schema for bid account (matches IDL)
+  const BID_SCHEMA = new Map([
+    ['task', { kind: 'publicKey' }],
+    ['bidder', { kind: 'publicKey' }],
+    ['proposal', { kind: 'string' }],
+    ['deposit', { kind: 'u64' }],
+    ['status', { kind: 'u8' }],
+    ['createdAt', { kind: 'i64' }],
+    ['bump', { kind: 'u8' }],
+  ])
+  const { struct, u64, u8, i64, publicKey, str } = await import('@coral-xyz/borsh')
+  const BID_LAYOUT = struct([
+    publicKey('task'),
+    publicKey('bidder'),
+    str('proposal'),
+    u64('deposit'),
+    u8('status'),
+    i64('createdAt'),
+    u8('bump'),
+  ])
+  const results = []
+  for (const { pubkey, account } of accounts) {
+    try {
+      const raw = BID_LAYOUT.decode(account.data.slice(8))
+      const decoded: Record<string, unknown> = {}
+      for (const [k, v] of Object.entries(raw)) {
+        decoded[k] = (v && typeof v === 'object' && typeof (v as any).toString === 'function' && (v as any)._bn !== undefined)
+          ? (v as any).toString()
+          : v
+      }
+      results.push({ pubkey: pubkey.toBase58(), data: decoded })
+    } catch { /* skip invalid accounts */ }
+  }
+  return results
+}
+
 /** Fetch ALL Task accounts from the program (devnet scan) */
 export async function fetchAllTasks(): Promise<unknown[]> {
   const program = getProgram()
