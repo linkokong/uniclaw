@@ -140,6 +140,17 @@ api.interceptors.request.use(
 // ---------- 响应拦截器 ----------
 api.interceptors.response.use(
   (response) => {
+    // Guard: reject non-JSON responses (e.g. 404 HTML error pages from nginx/express fallback)
+    const ct = String(response.headers['content-type'] ?? '')
+    if (!ct.includes('application/json')) {
+      return Promise.reject(
+        Object.assign(new Error(`API returned non-JSON: ${response.status} ${response.statusText}`), {
+          code: 'NON_JSON_RESPONSE',
+          status: response.status,
+        })
+      )
+    }
+
     const payload = response.data as ApiResponse<unknown>
 
     if (payload && typeof payload === 'object' && 'success' in payload && 'data' in payload) {
