@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useWallet } from '@solana/wallet-adapter-react'
 import { Link } from 'react-router-dom'
-
+import ApiKeyManager from '../components/ApiKeyManager'
 export default function SettingsPage() {
   const { publicKey, connected } = useWallet()
   const [notifications, setNotifications] = useState(true)
@@ -156,6 +156,17 @@ export default function SettingsPage() {
             Clear Local Data
           </button>
           <p className="text-gray-500 text-xs mt-2">This will clear your onboarding status and local preferences</p>
+        </div>
+      </div>
+
+      {/* API Keys Section */}
+      <div className="bg-[#111827] border border-gray-800 rounded-xl">
+        <div className="p-4 border-b border-gray-800">
+          <h2 className="text-white font-semibold">API Keys</h2>
+          <p className="text-gray-500 text-xs">Manage API keys for external agents and scripts</p>
+        </div>
+        <div className="p-4">
+          <ApiKeyManager walletAddress={publicKey?.toBase58() || ''} />
         </div>
       </div>
     </div>

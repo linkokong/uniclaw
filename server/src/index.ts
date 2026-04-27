@@ -79,7 +79,6 @@ if (config.nodeEnv === 'production') {
     target: `http://localhost:${VITE_PORT}`,
     changeOrigin: true,
     ws: true,  // Proxy WebSocket for Vite HMR
-    logLevel: 'warn',
   })
   app.use(viteProxy)
 }

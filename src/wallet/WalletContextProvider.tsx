@@ -13,7 +13,7 @@ interface WalletContextProviderProps {
 }
 
 export default function WalletContextProvider({ children }: WalletContextProviderProps) {
-  const endpoint = useMemo(() => 'https://api.mainnet-beta.solana.com', [])
+  const endpoint = useMemo(() => 'https://api.devnet.solana.com', [])
 
   // Support Phantom and Solflare wallets
   const wallets = useMemo(

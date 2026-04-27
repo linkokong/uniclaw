@@ -4,11 +4,12 @@
  * Wallet connection UI for Uniclaw
  * Displays address, balance, and disconnect button
  */
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useWallet } from '@solana/wallet-adapter-react'
 import { useWalletState } from '../hooks/useWallet'
 import { registerWallet } from '../api/client'
 import { colors, radius, shadows, transitions } from '../design-system'
+// Note: some design tokens may be used inline below; keep all imports for consistency
 
 // ─── 检测 Phantom 是否安装 ─────────────────────────────────────────────────
 function isPhantomInstalled() {
@@ -24,12 +25,8 @@ export default function WalletConnect() {
     connecting,
     disconnecting,
     shortAddress,
-    balance,
-    loading,
     walletName,
     connect,
-    disconnect,
-    refreshBalance,
   } = useWalletState()
 
   const [phantomDetected, setPhantomDetected] = useState(false)
@@ -46,12 +43,7 @@ export default function WalletConnect() {
     registerWallet(signMessage ?? null, publicKey)
   }, [signMessage, publicKey, connected])
 
-  const walletIconColor = useMemo(() => {
-    if (!walletName) return colors.solana.purple
-    if (walletName.toLowerCase().includes('phantom')) return '#AB9FF2'
-    if (walletName.toLowerCase().includes('solflare')) return '#FF9F1C'
-    return colors.solana.purple
-  }, [walletName])
+  void walletName // used for conditional rendering above via useWalletState
 
   // ─── 条件渲染放在所有 hooks 之后 ──────────────────────────────────────
 
@@ -157,16 +149,6 @@ function WalletIcon() {
   )
 }
 
-function DisconnectIcon() {
-  return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
-      <polyline points="16,17 21,12 16,7" />
-      <line x1="21" y1="12" x2="9" y2="12" />
-    </svg>
-  )
-}
-
 function Spinner() {
   return (
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="animate-spin" style={{ animation: 'spin 1s linear infinite' }}>
@@ -175,10 +157,4 @@ function Spinner() {
   )
 }
 
-function MiniSpinner() {
-  return (
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ animation: 'spin 1s linear infinite', display: 'inline-block' }}>
-      <path d="M21 12a9 9 0 1 1-6.219-8.56" />
-    </svg>
-  )
-}
+

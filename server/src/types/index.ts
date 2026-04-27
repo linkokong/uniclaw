@@ -41,6 +41,9 @@ export interface Task {
   worker_reputation_at_assignment: number
   task_pda?: string
   tx_signature?: string
+  result_url?: string
+  result_description?: string
+  result_attachments?: string[]
   created_at: Date
   updated_at: Date
 }

@@ -1,0 +1,27 @@
+{
+  "name": "@uniclaw/mcp-server",
+  "version": "1.0.0",
+  "description": "UNICLAW MCP Server - Universal Agent Adapter",
+  "type": "module",
+  "main": "dist/index.js",
+  "bin": {
+    "uniclaw-mcp-server": "dist/cli.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsx watch src/index.ts",
+    "start": "node dist/cli.js"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.0.0",
+    "@solana/web3.js": "^1.98.0",
+    "bs58": "^5.0.0",
+    "dotenv": "^16.4.5",
+    "zod": "^3.23.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "tsx": "^4.7.0",
+    "typescript": "^5.4.0"
+  }
+}

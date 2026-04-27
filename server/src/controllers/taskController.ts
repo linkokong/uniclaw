@@ -130,7 +130,16 @@ export const taskController = {
 
   // POST /tasks/:id/submit - 提交任务结果
   submit: asyncHandler(async (req: AuthRequest, res: Response) => {
-    const task = await taskService.submit(String(req.params.id), req.user!.walletAddress)
+    const body = req.body as {
+      resultUrl?: string
+      resultDescription?: string
+      attachments?: string[]
+    }
+    const task = await taskService.submit(
+      String(req.params.id),
+      req.user!.walletAddress,
+      body
+    )
     res.json({ success: true, data: task })
   }),
 

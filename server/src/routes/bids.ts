@@ -24,6 +24,26 @@ const handleValidationErrors = (req: any, res: any, next: any) => {
 // 所有路由需要认证
 router.use(authenticateJWT)
 
+// GET /bids - List user's bids (alias for /bids/my, MCP compatible)
+router.get('/',
+  [
+    query('status')
+      .optional()
+      .isIn(['pending', 'accepted', 'rejected', 'withdrawn'])
+      .withMessage('Invalid status filter'),
+    query('page')
+      .optional()
+      .isInt({ min: 1 })
+      .toInt(),
+    query('limit')
+      .optional()
+      .isInt({ min: 1, max: 100 })
+      .toInt(),
+    handleValidationErrors
+  ],
+  bidController.myBids
+)
+
 // GET /bids/task/:taskId - 获取指定任务的投标列表
 router.get('/task/:taskId',
   [
@@ -94,8 +114,11 @@ router.get('/my',
 router.get('/:id',
   [
     param('id')
-      .isInt({ min: 1 })
-      .withMessage('Bid ID must be a positive integer'),
+      .custom((value: string) => {
+        // Support both UUID and integer ID formats
+        return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value) || /^\d+$/.test(value);
+      })
+      .withMessage('Bid ID must be a valid UUID or positive integer'),
     handleValidationErrors
   ],
   bidController.getById

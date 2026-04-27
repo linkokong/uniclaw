@@ -88,6 +88,28 @@ export async function initializeDatabase(): Promise<void> {
         updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
       );
 
+      -- Agents table
+      CREATE TABLE IF NOT EXISTS agents (
+        id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+        owner_wallet VARCHAR(44) NOT NULL,
+        name VARCHAR(100) NOT NULL,
+        description TEXT DEFAULT '',
+        capabilities TEXT[] DEFAULT '{}',
+        hourly_rate DECIMAL(10, 4) DEFAULT 0,
+        monthly_rate DECIMAL(10, 4) DEFAULT 0,
+        currency VARCHAR(10) DEFAULT 'SOL',
+        available BOOLEAN DEFAULT true,
+        verified BOOLEAN DEFAULT false,
+        rating DECIMAL(3, 2) DEFAULT 0,
+        total_jobs INTEGER DEFAULT 0,
+        completed_jobs INTEGER DEFAULT 0,
+        failed_jobs INTEGER DEFAULT 0,
+        total_earnings VARCHAR(50) DEFAULT '0',
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+        updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+        UNIQUE(owner_wallet)
+      );
+
       -- Transactions table
       CREATE TABLE IF NOT EXISTS transactions (
         id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -120,6 +142,36 @@ export async function initializeDatabase(): Promise<void> {
         revoked_at TIMESTAMP WITH TIME ZONE
       );
 
+      -- API Keys table (Sprint 2 W2: Identity Layer + API Key + RBAC)
+      CREATE TABLE IF NOT EXISTS api_keys (
+        id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+        user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+        wallet_address VARCHAR(44) NOT NULL,
+        key_hash VARCHAR(255) NOT NULL,
+        key_prefix VARCHAR(20) NOT NULL,
+        name VARCHAR(100) NOT NULL,
+        scopes TEXT[] DEFAULT '{}',
+        active BOOLEAN DEFAULT true,
+        expires_at TIMESTAMP WITH TIME ZONE,
+        last_used_at TIMESTAMP WITH TIME ZONE,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+        updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+      );
+
+      -- Audit logs table
+      CREATE TABLE IF NOT EXISTS audit_logs (
+        id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+        actor_type VARCHAR(20) NOT NULL,
+        actor_id VARCHAR(100) NOT NULL,
+        user_id UUID REFERENCES users(id) ON DELETE SET NULL,
+        action VARCHAR(50) NOT NULL,
+        resource_type VARCHAR(50),
+        resource_id UUID,
+        details JSONB,
+        ip_address INET,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+      );
+
       -- Indexes
       CREATE INDEX IF NOT EXISTS idx_tasks_creator ON tasks(creator_wallet);
       CREATE INDEX IF NOT EXISTS idx_tasks_worker ON tasks(worker_wallet);
@@ -130,6 +182,28 @@ export async function initializeDatabase(): Promise<void> {
       CREATE INDEX IF NOT EXISTS idx_transactions_to ON transactions(to_address);
       CREATE INDEX IF NOT EXISTS idx_transactions_task ON transactions(task_id);
     `)
+
+    // Migration: Add result columns to tasks if they don't exist (referenced by taskService.submit)
+    const colChecks = await client.query(`
+      SELECT column_name FROM information_schema.columns
+      WHERE table_name = 'tasks' AND column_name IN ('result_url', 'result_description', 'result_attachments', 'category', 'worker_reputation_at_assignment')
+    `)
+    const existingCols = new Set(colChecks.rows.map(r => r.column_name))
+    if (!existingCols.has('result_url')) {
+      await client.query(`ALTER TABLE tasks ADD COLUMN result_url TEXT`)
+    }
+    if (!existingCols.has('result_description')) {
+      await client.query(`ALTER TABLE tasks ADD COLUMN result_description TEXT`)
+    }
+    if (!existingCols.has('result_attachments')) {
+      await client.query(`ALTER TABLE tasks ADD COLUMN result_attachments TEXT[]`)
+    }
+    if (!existingCols.has('category')) {
+      await client.query(`ALTER TABLE tasks ADD COLUMN category VARCHAR(50)`)
+    }
+    if (!existingCols.has('worker_reputation_at_assignment')) {
+      await client.query(`ALTER TABLE tasks ADD COLUMN worker_reputation_at_assignment INTEGER DEFAULT 0`)
+    }
 
     console.log('Database initialized successfully')
   } finally {

@@ -158,30 +158,27 @@ export class UserService {
   }
 
   // Generate nonce for EIP-4361
+  // SECURITY FIX (C#3): 迁移到 Redis + 5 分钟 TTL，防止重放攻击
   async generateNonce(walletAddress: string): Promise<string> {
     const nonce = randomUUID().replace(/-/g, '').substring(0, 16)
-    const expiresAt = new Date(Date.now() + 5 * 60 * 1000) // 5 minutes
-
-    await pool.query(
-      `INSERT INTO auth_nonces (wallet_address, nonce, expires_at)
-       VALUES ($1, $2, $3)
-       ON CONFLICT (wallet_address) DO UPDATE
-       SET nonce = $2, expires_at = $3`,
-      [walletAddress, nonce, expiresAt]
-    )
+    const nonceKey = `nonce:${walletAddress}:${nonce}`
+    
+    // Redis SET EX 300 (5 minutes TTL)
+    await redis.set(nonceKey, nonce, 'EX', 300)
 
     return nonce
   }
 
-  // Verify and consume nonce
+  // Verify and consume nonce (now handled in auth.ts verifySiweMessage)
+  // DEPRECATED: 保留接口兼容，实际验证已迁移到 Redis
   async verifyNonce(walletAddress: string, nonce: string): Promise<boolean> {
-    const result = await pool.query(
-      `DELETE FROM auth_nonces
-       WHERE wallet_address = $1 AND nonce = $2 AND expires_at > NOW()
-       RETURNING id`,
-      [walletAddress, nonce]
-    )
-    return result.rows.length > 0
+    const nonceKey = `nonce:${walletAddress}:${nonce}`
+    const stored = await redis.get(nonceKey)
+    if (!stored) return false
+    
+    // 原子删除，防止重放
+    await redis.del(nonceKey)
+    return true
   }
 
   private mapUser(row: any): User {

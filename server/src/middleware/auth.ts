@@ -4,6 +4,7 @@ import { redis, pool } from '../models/index.js'
 import { config } from '../config/index.js'
 import { SessionData } from '../types/index.js'
 import { PublicKey } from '@solana/web3.js'
+import { randomUUID } from 'node:crypto'
 
 const JWT_SECRET = new TextEncoder().encode(config.jwt.secret)
 
@@ -11,6 +12,8 @@ export interface AuthRequest extends Request {
   user?: {
     walletAddress: string
     userId?: string
+    scopes?: string[]
+    authType?: 'jwt' | 'api_key' | 'agent_cert'
   }
   session?: SessionData
 }
@@ -48,7 +51,8 @@ export async function authenticateJWT(req: AuthRequest, res: Response, next: Nex
       const { payload } = await jwtVerify(token, JWT_SECRET)
       req.user = {
         walletAddress: payload.walletAddress as string,
-        userId: payload.userId as string | undefined
+        userId: payload.userId as string | undefined,
+        authType: 'jwt'
       }
       next()
     } catch {
@@ -107,19 +111,19 @@ export async function verifySiweMessage(
   signature: string
 ): Promise<boolean> {
   try {
-    // 1. Verify nonce exists and is not expired
-    const nonceData = await pool.query(
-      'SELECT expires_at FROM auth_nonces WHERE wallet_address = $1 AND nonce = $2',
-      [message.address, message.nonce]
-    )
-
-    if (nonceData.rows.length === 0) {
-      console.error('[verify] Nonce not found in DB:', message.nonce, 'for', message.address)
-      return false
+    // SECURITY FIX (C#3): Nonce 从 PostgreSQL 迁移到 Redis，带 5 分钟 TTL
+    // 1. Verify nonce exists in Redis (auto-expires via TTL)
+    // Try wallet-bound nonce first, then anonymous nonce
+    let nonceKey = `nonce:${message.address}:${message.nonce}`
+    let storedNonce = await redis.get(nonceKey)
+    if (!storedNonce) {
+      // Fallback: check if it was stored as anonymous nonce
+      nonceKey = `nonce:anonymous:${message.nonce}`
+      storedNonce = await redis.get(nonceKey)
     }
-    const expiresAt = new Date(nonceData.rows[0].expires_at)
-    if (expiresAt < new Date()) {
-      console.error('[verify] Nonce expired')
+
+    if (!storedNonce) {
+      console.error('[verify] Nonce not found or expired in Redis:', message.nonce, 'for', message.address)
       return false
     }
 
@@ -156,11 +160,8 @@ export async function verifySiweMessage(
 
     console.log('[verify] noble result:', isValid)
 
-    // 5. Delete nonce after verification attempt
-    await pool.query(
-      'DELETE FROM auth_nonces WHERE wallet_address = $1 AND nonce = $2',
-      [message.address, message.nonce]
-    )
+    // 5. Delete nonce after verification attempt (atomic, prevents replay)
+    await redis.del(nonceKey)
 
     return isValid
   } catch (error) {
@@ -179,4 +180,18 @@ export function optionalAuth(req: AuthRequest, res: Response, next: NextFunction
   }
 
   authenticateJWT(req, res, next)
+}
+
+// Generate nonce for wallet authentication
+export async function generateNonce(walletAddress?: string): Promise<string> {
+  const nonce = randomUUID().replace(/-/g, '').substring(0, 16)
+  // Store with wallet address if provided, otherwise anonymous
+  // verifySiweMessage looks up by nonce:${address}:${nonce}
+  const nonceKey = walletAddress ? `nonce:${walletAddress}:${nonce}` : `nonce:anonymous:${nonce}`
+  await redis.set(nonceKey, nonce, 'EX', 300) // 5 minutes TTL
+  // Also store a reverse mapping so verifySiweMessage can find anonymous nonces
+  if (!walletAddress) {
+    await redis.set(`nonce:anonymous:${nonce}`, nonce, 'EX', 300)
+  }
+  return nonce
 }

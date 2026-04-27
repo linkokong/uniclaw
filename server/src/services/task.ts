@@ -179,7 +179,11 @@ export class TaskService {
   }
 
   // Submit task (worker completes work)
-  async submit(taskId: string, workerWallet: string): Promise<Task> {
+  async submit(
+    taskId: string,
+    workerWallet: string,
+    resultData?: { resultUrl?: string; resultDescription?: string; attachments?: string[] }
+  ): Promise<Task> {
     const task = await this.getById(taskId)
 
     if (task.worker_wallet !== workerWallet) {
@@ -193,9 +197,12 @@ export class TaskService {
       `UPDATE tasks SET
          status = 'completed',
          submission_time = NOW(),
+         result_url = $2,
+         result_description = $3,
+         result_attachments = $4,
          updated_at = NOW()
        WHERE id = $1 RETURNING *`,
-      [taskId]
+      [taskId, resultData?.resultUrl || null, resultData?.resultDescription || null, resultData?.attachments || null]
     )
 
     return this.mapTask(result.rows[0])
@@ -300,6 +307,9 @@ export class TaskService {
       updated_at: row.updated_at,
       task_pda: row.task_pda,
       tx_signature: row.tx_signature,
+      result_url: row.result_url,
+      result_description: row.result_description,
+      result_attachments: row.result_attachments,
     }
   }
 
