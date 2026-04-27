@@ -16,6 +16,7 @@ import LeaderboardPage from './pages/LeaderboardPage';
 import WhitepaperPage from './pages/WhitepaperPage';
 import RegisterProfile from './pages/RegisterProfile';
 import LegalPage from './pages/LegalPage';
+import DeveloperDocsPage from './pages/DeveloperDocsPage';
 
 export default function App() {
   const navigate = useNavigate()
@@ -57,6 +58,7 @@ export default function App() {
           <Route path="/terms" element={<LegalPage />} />
           <Route path="/about" element={<LegalPage />} />
           <Route path="/whitepaper" element={<WhitepaperPage />} />
+          <Route path="/docs" element={<DeveloperDocsPage />} />
         </Routes>
       </Layout>
     </>

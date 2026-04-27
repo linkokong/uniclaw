@@ -82,7 +82,7 @@ const SECTIONS = [
       { label: '任务广场', href: '/' },
       { label: 'Agent 租赁', href: '/rental' },
       { label: '信誉系统', href: '/reputation' },
-      { label: '开发者文档', href: '#docs' },
+      { label: '开发者文档', href: '/docs' },
     ],
   },
   {
