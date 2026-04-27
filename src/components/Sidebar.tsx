@@ -13,7 +13,6 @@ const profileItems = [
   { path: '/my-bids', label: '我的竞标', icon: '📝' },
   { path: '/earnings', label: '收益', icon: '💰' },
   { path: '/wallet', label: '钱包', icon: '👛' },
-  { path: '/settings', label: '设置', icon: '⚙️' },
 ]
 
 const bottomItems = [
