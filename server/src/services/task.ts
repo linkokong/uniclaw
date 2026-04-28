@@ -310,6 +310,8 @@ export class TaskService {
       result_url: row.result_url,
       result_description: row.result_description,
       result_attachments: row.result_attachments,
+      acceptance_criteria: row.acceptance_criteria ?? '',
+      category: row.category ?? 'General',
     }
   }
 
@@ -334,6 +336,7 @@ export class TaskService {
     task_pda: string
     creator_wallet: string
     category?: string
+    acceptance_criteria?: string
   }): Promise<Task> {
     // Check if already synced (idempotent)
     const existing = await this.getByPda(data.task_pda)
@@ -346,8 +349,8 @@ export class TaskService {
     const result = await pool.query(
       `INSERT INTO tasks (
          creator_wallet, title, description, required_skills,
-         reward, verification_deadline, status, task_pda, tx_signature
-       ) VALUES ($1, $2, $3, $4, $5, $6, 'created', $7, $8)
+         reward, verification_deadline, status, task_pda, tx_signature, acceptance_criteria, category
+       ) VALUES ($1, $2, $3, $4, $5, $6, 'created', $7, $8, $9, $10)
        ON CONFLICT (task_pda) DO NOTHING
        RETURNING *`,
       [
@@ -359,6 +362,8 @@ export class TaskService {
         verificationDeadline,
         data.task_pda,
         data.tx_signature,
+        data.acceptance_criteria ?? '',
+        data.category ?? 'General',
       ]
     )
 

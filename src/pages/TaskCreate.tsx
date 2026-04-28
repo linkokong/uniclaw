@@ -472,6 +472,10 @@ export function TaskCreatePage() {
       // Append a short nonce to title for unique PDA derivation (same user + same title won't collide)
       const nonce = Date.now().toString(36).slice(-4)
       const onChainTitle = `${form.title.trim()}#${nonce}`.slice(0, 100)
+      // Derive verification_period (seconds) from user-selected deadline
+      const verificationPeriod = form.deadline
+        ? Math.max(604800, Math.floor((new Date(form.deadline).getTime() - Date.now()) / 1000))
+        : 604800
       let txSignature: string
       if (form.paymentType === 'UNICLAW') {
         const rewardRaw = Math.round(parseFloat(form.reward) * 10 ** TOKENS.UNICLAW.decimals)
@@ -481,7 +485,7 @@ export function TaskCreatePage() {
           form.description.trim(),
           form.skills,
           rewardRaw,
-          604800,
+          verificationPeriod,
         )
       } else {
         const rewardLamports = Math.round(parseFloat(form.reward) * 1e9)
@@ -491,7 +495,7 @@ export function TaskCreatePage() {
           form.description.trim(),
           form.skills,
           rewardLamports,
-          604800,
+          verificationPeriod,
         )
       }
 
@@ -505,7 +509,8 @@ export function TaskCreatePage() {
           description: form.description.trim(),
           required_skills: form.skills,
           reward: form.reward,
-          verification_period: 604800,
+          verification_period: verificationPeriod,
+          acceptance_criteria: form.acceptanceCriteria,
           tx_signature: txSignature,
           task_pda: taskPda.toBase58(),
           creator_wallet: wallet.publicKey!.toBase58(),

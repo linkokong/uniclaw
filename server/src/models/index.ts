@@ -204,6 +204,9 @@ export async function initializeDatabase(): Promise<void> {
     if (!existingCols.has('worker_reputation_at_assignment')) {
       await client.query(`ALTER TABLE tasks ADD COLUMN worker_reputation_at_assignment INTEGER DEFAULT 0`)
     }
+    if (!existingCols.has('acceptance_criteria')) {
+      await client.query(`ALTER TABLE tasks ADD COLUMN acceptance_criteria TEXT DEFAULT ''`)
+    }
 
     console.log('Database initialized successfully')
   } finally {

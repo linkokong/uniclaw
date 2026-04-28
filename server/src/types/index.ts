@@ -44,6 +44,8 @@ export interface Task {
   result_url?: string
   result_description?: string
   result_attachments?: string[]
+  acceptance_criteria?: string
+  category?: string
   created_at: Date
   updated_at: Date
 }
