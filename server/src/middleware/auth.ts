@@ -148,17 +148,18 @@ export async function verifySiweMessage(
     const messageBytes = new TextEncoder().encode(reconstructedMessage)
     const publicKeyBytes = new Uint8Array(new PublicKey(message.address).toBytes())
 
-    console.log('[verify] sig len:', signatureBytes.length, '| msg len:', messageBytes.length, '| pk len:', publicKeyBytes.length)
-    console.log('[verify] signMessage bytes:', Buffer.from(messageBytes).toString('hex').substring(0, 80))
-    console.log('[verify] signMessage (str):', JSON.stringify(reconstructedMessage))
-    console.log('[verify] pk hex:', Buffer.from(publicKeyBytes).toString('hex'))
+    if (config.nodeEnv !== 'production') {
+      console.log('[verify] sig len:', signatureBytes.length, '| msg len:', messageBytes.length, '| pk len:', publicKeyBytes.length)
+    }
 
     // 4. Ed25519 verify using @noble/ed25519 with dynamic ESM import
     // This ensures proper WASM initialization in the ESM context used by tsx
     const { verifyAsync } = await import('@noble/ed25519')
     const isValid = await verifyAsync(signatureBytes, messageBytes, publicKeyBytes)
 
-    console.log('[verify] noble result:', isValid)
+    if (config.nodeEnv !== 'production') {
+      console.log('[verify] noble result:', isValid)
+    }
 
     // 5. Delete nonce after verification attempt (atomic, prevents replay)
     await redis.del(nonceKey)

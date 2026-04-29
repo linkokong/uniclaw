@@ -60,20 +60,21 @@ export interface AuthRequest extends Request {
   apiKey?: ApiKeyInfo
 }
 
-// Scope hierarchy: admin:all includes all other scopes
-const SCOPE_HIERARCHY: Record<Scope, Scope[]> = {
-  'admin:all': Object.keys(SCOPES).filter(s => s !== 'admin:all') as Scope[],
-  'read:profile': ['read:profile'],
-  'read:tasks': ['read:tasks'],
-  'read:agents': ['read:agents'],
-  'read:wallet': ['read:wallet'],
-  'write:tasks': ['write:tasks'],
-  'bid:tasks': ['bid:tasks'],
-  'accept:tasks': ['accept:tasks'],
-  'submit:tasks': ['submit:tasks'],
-  'register:agent': ['register:agent'],
-  'manage:agent': ['manage:agent'],
-  'withdraw:funds': ['withdraw:funds'],
+// Scope implication map: which scopes GRANT each required scope?
+// admin:all implies everything; higher scopes imply lower ones
+const SCOPE_IMPLIES: Record<Scope, Scope[]> = {
+  'admin:all': ['admin:all'], // handled separately before this lookup
+  'read:profile': ['read:profile', 'admin:all'],
+  'read:tasks': ['read:tasks', 'write:tasks', 'bid:tasks', 'accept:tasks', 'admin:all'],
+  'read:agents': ['read:agents', 'register:agent', 'manage:agent', 'admin:all'],
+  'read:wallet': ['read:wallet', 'withdraw:funds', 'admin:all'],
+  'write:tasks': ['write:tasks', 'admin:all'],
+  'bid:tasks': ['bid:tasks', 'admin:all'],
+  'accept:tasks': ['accept:tasks', 'admin:all'],
+  'submit:tasks': ['submit:tasks', 'admin:all'],
+  'register:agent': ['register:agent', 'admin:all'],
+  'manage:agent': ['manage:agent', 'admin:all'],
+  'withdraw:funds': ['withdraw:funds', 'admin:all'],
 }
 
 /**
@@ -251,10 +252,10 @@ export function requireScope(...requiredScopes: Scope[]) {
       return
     }
     
-    // Check if user has any of the required scopes
-    const hasScope = requiredScopes.some(scope => {
-      const effectiveScopes = SCOPE_HIERARCHY[scope] || [scope]
-      return effectiveScopes.some(s => userScopes.includes(s))
+    // Check if user has any scope that implies at least one required scope
+    const hasScope = requiredScopes.some(requiredScope => {
+      const grantingScopes = SCOPE_IMPLIES[requiredScope] || [requiredScope]
+      return grantingScopes.some(s => userScopes.includes(s))
     })
     
     if (!hasScope) {
