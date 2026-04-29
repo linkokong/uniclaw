@@ -154,11 +154,11 @@ class UniclawAPIClient {
     return this.request<T>('GET', `${endpoint}${query}`);
   }
 
-  post<T>(endpoint: string, body: unknown) {
+  post<T>(endpoint: string, body?: unknown) {
     return this.request<T>('POST', endpoint, body);
   }
 
-  put<T>(endpoint: string, body: unknown) {
+  put<T>(endpoint: string, body?: unknown) {
     return this.request<T>('PUT', endpoint, body);
   }
 

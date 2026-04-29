@@ -86,6 +86,10 @@ export const taskController = {
 
   // GET /tasks/my - 我的任务
   myTasks: asyncHandler(async (req: AuthRequest, res: Response) => {
+    if (!req.user) {
+      return res.status(401).json({ success: false, error: { code: 'UNAUTHORIZED', message: 'Authentication required' } })
+    }
+
     const page = Math.max(1, (req.query.page as unknown as number) || 1)
     const limit = Math.min(100, (req.query.limit as unknown as number) || 20)
     const role = (req.query.role as string) || 'all'

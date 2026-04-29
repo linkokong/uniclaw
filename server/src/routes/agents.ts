@@ -232,6 +232,58 @@ router.get('/:id',
   })
 )
 
+// GET /agents/me/reputation - 获取当前用户的 Agent 信誉统计 (MCP compatible)
+router.get('/me/reputation', authenticateJWT,
+  asyncHandler(async (req: AuthRequest, res: Response) => {
+    if (!req.user?.walletAddress) {
+      res.status(401).json({
+        success: false,
+        error: { code: 'UNAUTHORIZED', message: 'Wallet authentication required' }
+      })
+      return
+    }
+
+    const result = await pool.query(
+      `SELECT
+        id,
+        name,
+        rating,
+        total_jobs,
+        completed_jobs,
+        failed_jobs,
+        total_earnings,
+        owner_wallet
+       FROM agents WHERE owner_wallet = $1`,
+      [req.user.walletAddress]
+    )
+
+    if (result.rows.length === 0) {
+      res.status(404).json({
+        success: false,
+        error: { code: 'NOT_FOUND', message: 'Agent profile not found' }
+      })
+      return
+    }
+
+    const agent = result.rows[0]
+    res.json({
+      success: true,
+      data: {
+        agent_id: agent.id,
+        name: agent.name,
+        rating: agent.rating,
+        total_jobs: parseInt(agent.total_jobs),
+        completed_jobs: parseInt(agent.completed_jobs),
+        failed_jobs: parseInt(agent.failed_jobs),
+        success_rate: agent.total_jobs > 0
+          ? (agent.completed_jobs / agent.total_jobs * 100).toFixed(2) + '%'
+          : '0%',
+        total_earnings: agent.total_earnings
+      }
+    })
+  })
+)
+
 // GET /agents/:id/reputation - 获取 Agent 信誉统计
 router.get('/:id/reputation',
   asyncHandler(async (req: AuthRequest, res: Response) => {

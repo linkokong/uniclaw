@@ -189,9 +189,5 @@ export async function generateNonce(walletAddress?: string): Promise<string> {
   // verifySiweMessage looks up by nonce:${address}:${nonce}
   const nonceKey = walletAddress ? `nonce:${walletAddress}:${nonce}` : `nonce:anonymous:${nonce}`
   await redis.set(nonceKey, nonce, 'EX', 300) // 5 minutes TTL
-  // Also store a reverse mapping so verifySiweMessage can find anonymous nonces
-  if (!walletAddress) {
-    await redis.set(`nonce:anonymous:${nonce}`, nonce, 'EX', 300)
-  }
   return nonce
 }

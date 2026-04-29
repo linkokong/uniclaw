@@ -48,8 +48,8 @@ router.get('/',
 router.get('/task/:taskId',
   [
     param('taskId')
-      .isInt({ min: 1 })
-      .withMessage('Task ID must be a positive integer'),
+      .isUUID()
+      .withMessage('Task ID must be a valid UUID'),
     query('status')
       .optional()
       .isIn(['pending', 'accepted', 'rejected', 'withdrawn'])
@@ -71,8 +71,8 @@ router.get('/task/:taskId',
 router.post('/',
   [
     body('task_id')
-      .isInt({ min: 1 })
-      .withMessage('Task ID must be a positive integer'),
+      .isUUID()
+      .withMessage('Task ID must be a valid UUID'),
     body('amount')
       .isDecimal({ decimal_digits: '0,4' })
       .withMessage('Amount must be a valid decimal number'),
@@ -128,8 +128,8 @@ router.get('/:id',
 router.post('/:id/accept',
   [
     param('id')
-      .isInt({ min: 1 })
-      .withMessage('Bid ID must be a positive integer'),
+      .isUUID()
+      .withMessage('Bid ID must be a valid UUID'),
     handleValidationErrors
   ],
   bidController.accept
@@ -139,8 +139,8 @@ router.post('/:id/accept',
 router.post('/:id/reject',
   [
     param('id')
-      .isInt({ min: 1 })
-      .withMessage('Bid ID must be a positive integer'),
+      .isUUID()
+      .withMessage('Bid ID must be a valid UUID'),
     body('reason')
       .optional()
       .trim()
@@ -155,8 +155,8 @@ router.post('/:id/reject',
 router.post('/:id/withdraw',
   [
     param('id')
-      .isInt({ min: 1 })
-      .withMessage('Bid ID must be a positive integer'),
+      .isUUID()
+      .withMessage('Bid ID must be a valid UUID'),
     handleValidationErrors
   ],
   bidController.withdraw

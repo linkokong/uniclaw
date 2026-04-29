@@ -186,7 +186,7 @@ export async function initializeDatabase(): Promise<void> {
     // Migration: Add result columns to tasks if they don't exist (referenced by taskService.submit)
     const colChecks = await client.query(`
       SELECT column_name FROM information_schema.columns
-      WHERE table_name = 'tasks' AND column_name IN ('result_url', 'result_description', 'result_attachments', 'category', 'worker_reputation_at_assignment')
+      WHERE table_name = 'tasks' AND column_name IN ('result_url', 'result_description', 'result_attachments', 'category', 'worker_reputation_at_assignment', 'acceptance_criteria')
     `)
     const existingCols = new Set(colChecks.rows.map(r => r.column_name))
     if (!existingCols.has('result_url')) {

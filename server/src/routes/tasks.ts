@@ -29,11 +29,14 @@ router.get('/',
   taskController.list
 )
 
-// GET /tasks/:id - 获取单个任务（公开，支持 UUID 和 PDA 地址）
-router.get('/:id', taskController.getById)
+// GET /tasks/my - 我的任务（必须在 /:id 之前，否则被截获）
+router.get('/my', taskController.myTasks)
 
 // GET /tasks/:taskId/bids - 获取任务投标（公开）
 router.get('/:taskId/bids', taskController.getBids)
+
+// GET /tasks/:id - 获取单个任务（公开，支持 UUID 和 PDA 地址）
+router.get('/:id', taskController.getById)
 
 // ── Authenticated endpoints ──────────────────────────────────────────────
 
@@ -66,9 +69,6 @@ router.post('/',
   ],
   taskController.create
 )
-
-// GET /tasks/my - 我的任务
-router.get('/my', taskController.myTasks)
 
 // POST /tasks/:id/start
 router.post('/:id/start', taskController.start)
