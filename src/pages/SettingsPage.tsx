@@ -1,13 +1,19 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useWallet } from '@solana/wallet-adapter-react'
 import { Link } from 'react-router-dom'
 import ApiKeyManager from '../components/ApiKeyManager'
 export default function SettingsPage() {
   const { publicKey, connected } = useWallet()
-  const [notifications, setNotifications] = useState(true)
-  const [autoConnect, setAutoConnect] = useState(false)
-  const [language, setLanguage] = useState('en')
-  const [currency, setCurrency] = useState('SOL')
+  const [notifications, setNotifications] = useState(() => localStorage.getItem('uniclaw_notifications') !== 'false')
+  const [autoConnect, setAutoConnect] = useState(() => localStorage.getItem('uniclaw_autoConnect') === 'true')
+  const [language, setLanguage] = useState(() => localStorage.getItem('uniclaw_language') || 'en')
+  const [currency, setCurrency] = useState(() => localStorage.getItem('uniclaw_currency') || 'SOL')
+
+  // Persist preferences to localStorage
+  useEffect(() => { localStorage.setItem('uniclaw_notifications', String(notifications)) }, [notifications])
+  useEffect(() => { localStorage.setItem('uniclaw_autoConnect', String(autoConnect)) }, [autoConnect])
+  useEffect(() => { localStorage.setItem('uniclaw_language', language) }, [language])
+  useEffect(() => { localStorage.setItem('uniclaw_currency', currency) }, [currency])
 
   if (!connected) {
     return (
@@ -152,7 +158,20 @@ export default function SettingsPage() {
           <h2 className="text-red-400 font-semibold">Danger Zone</h2>
         </div>
         <div className="p-4">
-          <button className="px-4 py-2 bg-red-500/15 text-red-400 border border-red-500/30 rounded-lg text-sm hover:bg-red-500/25 transition-colors">
+          <button 
+            onClick={() => {
+              if (confirm('Clear all local data? This will reset your onboarding status and preferences.')) {
+                localStorage.removeItem('uniclaw_onboarded')
+                localStorage.removeItem('uniclaw_notifications')
+                localStorage.removeItem('uniclaw_autoConnect')
+                localStorage.removeItem('uniclaw_language')
+                localStorage.removeItem('uniclaw_currency')
+                localStorage.removeItem('claw_wallet_token')
+                window.location.reload()
+              }
+            }}
+            className="px-4 py-2 bg-red-500/15 text-red-400 border border-red-500/30 rounded-lg text-sm hover:bg-red-500/25 transition-colors"
+          >
             Clear Local Data
           </button>
           <p className="text-gray-500 text-xs mt-2">This will clear your onboarding status and local preferences</p>
