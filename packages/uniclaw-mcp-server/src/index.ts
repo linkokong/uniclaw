@@ -771,18 +771,22 @@ async function handleAuthenticate(args: unknown) {
       return errorResult('Wallet auth requires: message, signature, publicKey');
     }
     const result = await api.post<{
-      token?: string;
-      refreshToken?: string;
-      expiresIn?: number;
-      user?: unknown;
-      error?: string;
+      success?: boolean;
+      data?: {
+        token?: string;
+        expiresIn?: number;
+        user?: unknown;
+      };
+      error?: string | { code?: string; message?: string };
     }>('/auth/verify', { message, signature, publicKey });
 
-    if (result.error || !result.token) {
-      return errorResult(result.error || 'Authentication failed');
+    const authData = result.data;
+    const errMsg = typeof result.error === 'string' ? result.error : (result.error as { message?: string } | undefined)?.message;
+    if (!result.success || !authData?.token) {
+      return errorResult(errMsg || 'Authentication failed');
     }
 
-    api.setWalletToken(result.token, result.refreshToken, result.expiresIn);
+    api.setWalletToken(authData.token, undefined, authData.expiresIn);
 
     return {
       content: [{
@@ -790,8 +794,8 @@ async function handleAuthenticate(args: unknown) {
         text: JSON.stringify({
           success: true,
           method: 'wallet',
-          user: result.user,
-          expiresIn: result.expiresIn,
+          user: authData.user,
+          expiresIn: authData.expiresIn,
           message: '✅ Wallet authenticated. You can now use all UNICLAW tools.',
         }, null, 2),
       }],
@@ -800,12 +804,15 @@ async function handleAuthenticate(args: unknown) {
     if (!apiKey?.startsWith('uniclaw_sk_')) {
       return errorResult('API key must start with "uniclaw_sk_"');
     }
-    const result = await api.post<{ valid?: boolean; scopes?: string[]; error?: string }>(
-      '/auth/verify-api-key',
-      { apiKey }
-    );
-    if (!result.valid) {
-      return errorResult(result.error || 'Invalid API key');
+    const result = await api.post<{
+      success?: boolean;
+      valid?: boolean;
+      scopes?: string[];
+      error?: string | { code?: string; message?: string };
+    }>('/auth/verify-api-key', { apiKey });
+    const errMsg = typeof result.error === 'string' ? result.error : (result.error as { message?: string } | undefined)?.message;
+    if (!result.success || !result.valid) {
+      return errorResult(errMsg || 'Invalid API key');
     }
     api.setApiKey(apiKey);
     return {
@@ -865,27 +872,32 @@ async function handleFindWork(args: unknown) {
     offset: z.number().optional().default(0),
   }).parse(args);
 
+  // Map MCP status to backend status: 'open' → 'created' (backend enum)
+  const backendStatus = params.status === 'open' ? 'created' : params.status;
+  // Backend uses page-based pagination, not offset. Convert offset → page.
+  const page = Math.max(1, Math.floor(params.offset / params.limit) + 1);
   const query: Record<string, string> = {
-    status: params.status,
+    status: backendStatus,
     limit: params.limit.toString(),
-    offset: params.offset.toString(),
+    page: page.toString(),
   };
-  if (params.minReward) query.minReward = params.minReward.toString();
-  if (params.maxReward) query.maxReward = params.maxReward.toString();
+  // NOTE: minReward/maxReward are not yet supported by the backend (silently ignored)
   if (params.skills?.length) query.skills = params.skills.join(',');
 
   const result = await api.get<{
-    tasks?: unknown[];
-    total?: number;
-    error?: string;
+    success?: boolean;
+    data?: Array<{
+      id: string; title: string; description: string;
+      reward: string; verification_deadline: string; status: string; required_skills: string[];
+    }>;
+    meta?: { total?: number };
+    error?: string | { code?: string; message?: string };
   }>('/tasks', query);
 
-  if ((result as {error?: string}).error) return errorResult((result as {error: string}).error);
+  const errMsg = typeof result.error === 'string' ? result.error : (result.error as { message?: string } | undefined)?.message;
+  if (!result.success) return errorResult(errMsg || 'Failed to fetch tasks');
 
-  const tasks = (result.tasks || []) as Array<{
-    id: string; title: string; description: string;
-    reward: number; deadline: string; status: string; skills: string[];
-  }>;
+  const tasks = result.data || [];
 
   if (tasks.length === 0) {
     return {
@@ -903,14 +915,16 @@ async function handleFindWork(args: unknown) {
     content: [{
       type: 'text' as const,
       text: JSON.stringify({
-        total: result.total || tasks.length,
+        total: result.meta?.total || tasks.length,
         message: `Found ${tasks.length} task(s)`,
         tasks: tasks.map(t => ({
           id: t.id,
           title: t.title,
           reward: `${t.reward} SOL`,
-          deadline: new Date(t.deadline).toLocaleDateString(),
-          skills: t.skills,
+          deadline: t.verification_deadline
+            ? new Date(t.verification_deadline).toLocaleDateString()
+            : 'N/A',
+          skills: t.required_skills || [],
           snippet: t.description.slice(0, 80) + '...',
         })),
         tip: 'Use get_task_details for full info, then submit_proposal to bid',
@@ -925,19 +939,24 @@ async function handleGetTaskDetails(args: unknown) {
     includeBids: z.boolean().optional().default(false),
   }).parse(args);
 
-  const result = await api.get<{ task?: unknown; error?: string }>(
+  const result = await api.get<{
+    success?: boolean;
+    data?: unknown;
+    error?: string | { code?: string; message?: string };
+  }>(
     `/tasks/${taskId}`,
     includeBids ? { includeBids: 'true' } : undefined
   );
 
-  if (result.error || !result.task) {
-    return errorResult(result.error || 'Task not found');
+  const errMsg = typeof result.error === 'string' ? result.error : (result.error as { message?: string } | undefined)?.message;
+  if (!result.success || !result.data) {
+    return errorResult(errMsg || 'Task not found');
   }
 
   return {
     content: [{
       type: 'text' as const,
-      text: JSON.stringify(result.task, null, 2),
+      text: JSON.stringify(result.data, null, 2),
     }],
   };
 }
@@ -950,24 +969,26 @@ async function handleSubmitProposal(args: unknown) {
     estimatedHours: z.number().positive().optional(),
   }).parse(args);
 
-  const result = await api.post<{ id?: string; error?: string }>(
-    '/bids',
-    {
-      task_id: params.taskId,
-      amount: params.amount.toString(),
-      proposal: params.proposal,
-      estimated_duration: params.estimatedHours || 1,
-    }
-  );
+  const result = await api.post<{
+    success?: boolean;
+    data?: { id?: string };
+    error?: string | { code?: string; message?: string };
+  }>('/bids', {
+    task_id: params.taskId,
+    amount: params.amount.toString(),
+    proposal: params.proposal,
+    estimated_duration: params.estimatedHours || 1,
+  });
 
-  if ((result as {error?: string}).error) return errorResult((result as {error: string}).error);
+  const errMsg = typeof result.error === 'string' ? result.error : (result.error as { message?: string } | undefined)?.message;
+  if (!result.success) return errorResult(errMsg || 'Failed to submit proposal');
 
   return {
     content: [{
       type: 'text' as const,
       text: JSON.stringify({
         success: true,
-        bidId: result.id,
+        bidId: result.data?.id,
         message: `✅ Proposal submitted for ${params.amount} SOL`,
         nextSteps: [
           'Wait for task creator to review (typically 24-72h)',
@@ -989,9 +1010,15 @@ async function handleManageProposals(args: unknown) {
 
   switch (action) {
     case 'list': {
-      result = await api.get<{ bids?: Array<{ id: string; taskTitle: string; amount: number; status: string }>; error?: string }>('/bids');
-      if ((result as {error?: string}).error) return errorResult((result as {error: string}).error);
-      const bids = ((result as {bids?: Array<{id: string; taskTitle: string; amount: number; status: string}>}).bids || []);
+      result = await api.get<{
+        success?: boolean;
+        data?: Array<{ id: string; taskTitle: string; amount: number; status: string }>;
+        meta?: { total?: number };
+        error?: string | { code?: string; message?: string };
+      }>('/bids');
+      const listErr = typeof (result as {error?: unknown}).error === 'string' ? (result as {error: string}).error : ((result as {error?: {message?: string}}).error)?.message;
+      if (!(result as {success?: boolean}).success) return errorResult(listErr || 'Failed to fetch bids');
+      const bids = ((result as {data?: Array<{id: string; taskTitle: string; amount: number; status: string}>}).data || []);
       return {
         content: [{
           type: 'text' as const,
@@ -1009,14 +1036,24 @@ async function handleManageProposals(args: unknown) {
     }
     case 'status': {
       if (!bidId) return errorResult('bidId required for status action');
-      result = await api.get<Record<string, unknown>>(`/bids/${bidId}`);
-      if ((result as {error?: string}).error) return errorResult((result as {error: string}).error);
-      return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
+      result = await api.get<{
+        success?: boolean;
+        data?: unknown;
+        error?: string | { code?: string; message?: string };
+      }>(`/bids/${bidId}`);
+      const statusErr = typeof (result as {error?: unknown}).error === 'string' ? (result as {error: string}).error : ((result as {error?: {message?: string}}).error)?.message;
+      if (!(result as {success?: boolean}).success) return errorResult(statusErr || 'Failed to fetch bid');
+      return { content: [{ type: 'text' as const, text: JSON.stringify((result as {data?: unknown}).data, null, 2) }] };
     }
     case 'withdraw': {
       if (!bidId) return errorResult('bidId required for withdraw action');
-      result = await api.post<{ error?: string }>(`/bids/${bidId}/withdraw`);
-      if ((result as {error?: string}).error) return errorResult((result as {error: string}).error);
+      result = await api.post<{
+        success?: boolean;
+        data?: unknown;
+        error?: string | { code?: string; message?: string };
+      }>(`/bids/${bidId}/withdraw`);
+      const withdrawErr = typeof (result as {error?: unknown}).error === 'string' ? (result as {error: string}).error : ((result as {error?: {message?: string}}).error)?.message;
+      if (!(result as {success?: boolean}).success) return errorResult(withdrawErr || 'Failed to withdraw');
       return {
         content: [{
           type: 'text' as const,
@@ -1038,12 +1075,14 @@ async function handleDeliverWork(args: unknown) {
     attachments: z.array(z.string()).optional(),
   }).parse(args);
 
-  const result = await api.post<{ error?: string }>(
-    `/tasks/${params.taskId}/submit`,
-    params
-  );
+  const result = await api.post<{
+    success?: boolean;
+    data?: unknown;
+    error?: string | { code?: string; message?: string };
+  }>(`/tasks/${params.taskId}/submit`, params);
 
-  if ((result as {error?: string}).error) return errorResult((result as {error: string}).error);
+  const errMsg = typeof result.error === 'string' ? result.error : (result.error as { message?: string } | undefined)?.message;
+  if (!result.success) return errorResult(errMsg || 'Failed to submit work');
 
   return {
     content: [{
@@ -1078,26 +1117,36 @@ async function handleManageProfile(args: unknown) {
 
   switch (params.action) {
     case 'get': {
-      result = await api.get<{ error?: string }>('/agents/me');
-      if ((result as {error?: string}).error) return errorResult((result as {error: string}).error);
-      return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
+      result = await api.get<{
+        success?: boolean;
+        data?: unknown;
+        error?: string | { code?: string; message?: string };
+      }>('/agents/me');
+      const getErr = typeof (result as {error?: unknown}).error === 'string' ? (result as {error: string}).error : ((result as {error?: {message?: string}}).error)?.message;
+      if (!(result as {success?: boolean}).success) return errorResult(getErr || 'Failed to fetch profile');
+      return { content: [{ type: 'text' as const, text: JSON.stringify((result as {data?: unknown}).data, null, 2) }] };
     }
     case 'register': {
       if (!params.name) return errorResult('name required for registration');
-      result = await api.post<{ id?: string; error?: string }>('/agents', {
+      result = await api.post<{
+        success?: boolean;
+        data?: { id?: string };
+        error?: string | { code?: string; message?: string };
+      }>('/agents', {
         name: params.name,
         description: params.description,
         skills: params.skills,
         hourlyRate: params.hourlyRate,
         availability: params.availability || 'available',
       });
-      if ((result as {error?: string}).error) return errorResult((result as {error: string}).error);
+      const regErr = typeof (result as {error?: unknown}).error === 'string' ? (result as {error: string}).error : ((result as {error?: {message?: string}}).error)?.message;
+      if (!(result as {success?: boolean}).success) return errorResult(regErr || 'Failed to register');
       return {
         content: [{
           type: 'text' as const,
           text: JSON.stringify({
             success: true,
-            agentId: (result as {id?: string}).id,
+            agentId: (result as {data?: {id?: string}}).data?.id,
             message: `✅ Agent profile created: ${params.name}`,
             nextSteps: [
               'Your profile is now visible in the Agent marketplace',
@@ -1115,8 +1164,13 @@ async function handleManageProfile(args: unknown) {
       if (params.skills) updateData.skills = params.skills;
       if (params.hourlyRate) updateData.hourlyRate = params.hourlyRate;
       if (params.availability) updateData.availability = params.availability;
-      result = await api.put<{ error?: string }>('/agents/me', updateData);
-      if ((result as {error?: string}).error) return errorResult((result as {error: string}).error);
+      result = await api.put<{
+        success?: boolean;
+        data?: unknown;
+        error?: string | { code?: string; message?: string };
+      }>('/agents/me', updateData);
+      const updateErr = typeof (result as {error?: unknown}).error === 'string' ? (result as {error: string}).error : ((result as {error?: {message?: string}}).error)?.message;
+      if (!(result as {success?: boolean}).success) return errorResult(updateErr || 'Failed to update profile');
       return {
         content: [{
           type: 'text' as const,
@@ -1133,14 +1187,19 @@ async function handleViewReputation(args: unknown) {
   }).parse(args);
 
   const endpoint = agentId ? `/agents/${agentId}/reputation` : '/agents/me/reputation';
-  const result = await api.get<{ error?: string }>(endpoint);
+  const result = await api.get<{
+    success?: boolean;
+    data?: unknown;
+    error?: string | { code?: string; message?: string };
+  }>(endpoint);
 
-  if ((result as {error?: string}).error) return errorResult((result as {error: string}).error);
+  const repErr = typeof result.error === 'string' ? result.error : (result.error as { message?: string } | undefined)?.message;
+  if (!result.success) return errorResult(repErr || 'Failed to fetch reputation');
 
   return {
     content: [{
       type: 'text' as const,
-      text: JSON.stringify(result, null, 2),
+      text: JSON.stringify(result.data, null, 2),
     }],
   };
 }

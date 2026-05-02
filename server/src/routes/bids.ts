@@ -76,15 +76,15 @@ router.post('/',
     body('amount')
       .isDecimal({ decimal_digits: '0,4' })
       .withMessage('Amount must be a valid decimal number'),
-    body('message')
+    body('proposal')
       .optional()
       .trim()
       .isLength({ max: 5000 })
-      .withMessage('Message must be max 5000 characters'),
-    body('estimated_time')
+      .withMessage('Proposal must be max 5000 characters'),
+    body('estimated_duration')
       .optional()
       .isInt({ min: 1 })
-      .withMessage('Estimated time must be a positive integer (hours)'),
+      .withMessage('Estimated duration must be a positive integer (hours)'),
     handleValidationErrors
   ],
   bidController.create
