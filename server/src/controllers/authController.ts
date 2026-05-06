@@ -86,6 +86,7 @@ export const walletLogin = asyncHandler(async (req: AuthRequest, res: Response) 
 
 // POST /auth/verify - MCP Server 专用认证端点
 // 接受 JSON body: { message, signature, publicKey }
+// SECURITY FIX (P0): Add nonce replay protection
 export const walletVerify = asyncHandler(async (req: AuthRequest, res: Response) => {
   const { message, signature, publicKey } = req.body
 
@@ -101,10 +102,42 @@ export const walletVerify = asyncHandler(async (req: AuthRequest, res: Response)
     })
   }
 
-  // 验证签名
+  // SECURITY FIX: Extract nonce from message and check Redis
+  // Message format: "... Nonce: xxxxxx ..."
+  const nonceMatch = message.match(/Nonce:\s*(\S+)/)
+  const nonce = nonceMatch?.[1]
+
+  if (!nonce) {
+    return res.status(400).json({
+      success: false,
+      error: { code: 'VALIDATION_ERROR', message: 'Could not extract nonce from message' }
+    })
+  }
+
+  // Check nonce exists in Redis (prevents replay)
+  let nonceKey = `nonce:${publicKey}:${nonce}`
+  let storedNonce = await redis.get(nonceKey)
+  if (!storedNonce) {
+    // Fallback: check anonymous nonce
+    nonceKey = `nonce:anonymous:${nonce}`
+    storedNonce = await redis.get(nonceKey)
+  }
+
+  if (!storedNonce) {
+    console.error('[walletVerify] Nonce not found or expired:', nonce, 'for', publicKey)
+    return res.status(401).json({
+      success: false,
+      error: { code: 'INVALID_NONCE', message: 'Nonce not found or expired' }
+    })
+  }
+
+  // 验证签名 (still using tweetnacl for now, can migrate to @noble/ed25519 later)
   const isValid = await verifyMessageSignature(publicKey, message, signature)
 
   console.log('[walletVerify] verify result:', isValid)
+
+  // Delete nonce after verification attempt (atomic, prevents replay)
+  await redis.del(nonceKey)
 
   if (!isValid) {
     return res.status(401).json({

@@ -75,6 +75,8 @@ export interface Task {
   acceptanceCriteria?: string[]
   paymentType?: PaymentType
   tokenMint?: string
+  task_pda?: string  // On-chain PDA address
+  tx_signature?: string  // Transaction signature
 }
 
 export interface TaskPublisher {

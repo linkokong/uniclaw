@@ -5,6 +5,7 @@ import { config } from '../config/index.js'
 import { SessionData } from '../types/index.js'
 import { PublicKey } from '@solana/web3.js'
 import { randomUUID } from 'node:crypto'
+import type { Scope } from './apiKeyAuth.js'
 
 const JWT_SECRET = new TextEncoder().encode(config.jwt.secret)
 
@@ -12,8 +13,8 @@ export interface AuthRequest extends Request {
   user?: {
     walletAddress: string
     userId?: string
-    scopes?: string[]
-    authType?: 'jwt' | 'api_key' | 'agent_cert'
+    scopes?: Scope[]
+    authType: 'jwt' | 'api_key' | 'agent_cert'
   }
   session?: SessionData
 }
@@ -33,7 +34,8 @@ export async function generateRefreshToken(): Promise<string> {
   return Array.from(randomBytes).map(b => b.toString(16).padStart(2, '0')).join('')
 }
 
-// JWT Authentication middleware
+// JWT Authentication middleware (with API Key fallback)
+// SECURITY FIX: Support both JWT and API Key authentication
 export async function authenticateJWT(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
   try {
     const authHeader = req.headers.authorization
@@ -47,6 +49,14 @@ export async function authenticateJWT(req: AuthRequest, res: Response, next: Nex
 
     const token = authHeader.substring(7)
 
+    // Check if it's an API Key (uniclaw_sk_xxx)
+    if (token.startsWith('uniclaw_sk_')) {
+      // Delegate to API Key authentication
+      const { authenticateApiKey } = await import('./apiKeyAuth.js')
+      return authenticateApiKey(req, res, next)
+    }
+
+    // Otherwise, verify as JWT
     try {
       const { payload } = await jwtVerify(token, JWT_SECRET)
       req.user = {
@@ -94,7 +104,8 @@ export async function authenticateSession(req: AuthRequest, res: Response, next:
       req.session = session
       req.user = {
         walletAddress: session.walletAddress,
-        userId: session.userId
+        userId: session.userId,
+        authType: 'jwt'
       }
     }
 

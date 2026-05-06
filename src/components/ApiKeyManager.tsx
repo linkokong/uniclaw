@@ -53,7 +53,7 @@ export default function ApiKeyManager({ walletAddress }: Props) {
   const fetchKeys = async () => {
     try {
       const token = localStorage.getItem('claw_wallet_token')
-      const res = await fetch('/api/v1/api-keys', {
+      const res = await fetch(`${import.meta.env.VITE_API_URL || '/api/v1'}/api-keys`, {
         headers: { Authorization: `Bearer ${token}` }
       })
       const data = await res.json()
@@ -70,7 +70,7 @@ export default function ApiKeyManager({ walletAddress }: Props) {
   const createKey = async () => {
     try {
       const token = localStorage.getItem('claw_wallet_token')
-      const res = await fetch('/api/v1/api-keys', {
+      const res = await fetch(`${import.meta.env.VITE_API_URL || '/api/v1'}/api-keys`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -97,7 +97,7 @@ export default function ApiKeyManager({ walletAddress }: Props) {
     
     try {
       const token = localStorage.getItem('claw_wallet_token')
-      const res = await fetch(`/api/v1/api-keys/${id}`, {
+      const res = await fetch(`${import.meta.env.VITE_API_URL || '/api/v1'}/api-keys/${id}`, {
         method: 'DELETE',
         headers: { Authorization: `Bearer ${token}` }
       })
